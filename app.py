@@ -41,7 +41,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database
 if os.environ.get("DATABASE_URL"):
-    # Production database (PostgreSQL)
+    # Production database (PostgreSQL/CockroachDB)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 else:
     # Development database (SQLite)
