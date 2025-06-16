@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: modulair
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --config gunicorn.conf.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        sync: false # Render will prompt for this value during deployment
+      - key: SESSION_SECRET
+        generateValue: true # Render will generate a random value
+    healthCheckPath: /
+    autoDeploy: true 

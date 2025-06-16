@@ -14,4 +14,5 @@ openai>=1.86.0
 python-dotenv>=1.0.0
 Flask-Migrate>=4.0.5
 psycopg2-binary>=2.9.9
-sqlalchemy-cockroachdb>=2.0.3 
+sqlalchemy-cockroachdb>=2.0.3
+gevent>=23.9.1 
