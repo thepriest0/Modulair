@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Final Exam Review - {{ course.title }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 py-8">
+    <div class="max-w-4xl mx-auto px-4">
+        <!-- Header -->
+        <div class="mb-8">
+            <nav class="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+                <a href="{{ url_for('index') }}" class="hover:text-red-600">Dashboard</a>
+                <i class="fas fa-chevron-right"></i>
+                <a href="{{ url_for('course_detail', course_id=course.id) }}" class="hover:text-red-600">{{ course.title }}</a>
+                <i class="fas fa-chevron-right"></i>
+                <span class="text-gray-900">Final Exam Review</span>
+            </nav>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-eye text-orange-600 text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900">Review Your Answers</h1>
+                <p class="text-gray-600 mt-2">{{ quiz.title }} - {{ course.title }}</p>
+            </div>
+        </div>
+
+        <!-- Review Instructions -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-info-circle text-blue-600 mr-3"></i>
+                <h2 class="text-xl font-semibold">Review Instructions</h2>
+            </div>
+            <div class="space-y-2 text-gray-700">
+                <p>• Review all your answers below before final submission</p>
+                <p>• You can go back to change any answer by clicking "Edit Answer"</p>
+                <p>• You need 70% or higher to pass and receive your certificate</p>
+                <p>• Once submitted, you'll see your results immediately</p>
+            </div>
+        </div>
+
+        <!-- Answer Review -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-xl font-semibold">Your Answers</h2>
+                <p class="text-gray-600 mt-1">{{ questions|length }} questions total</p>
+            </div>
+            
+            <div class="divide-y divide-gray-200">
+                {% for question in questions %}
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-medium text-gray-900">
+                                Question {{ loop.index }}
+                            </h3>
+                            <a href="{{ url_for('final_exam_question', course_id=course.id, question_num=loop.index) }}" 
+                               class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-edit mr-1"></i>Edit Answer
+                            </a>
+                        </div>
+                        
+                        <p class="text-gray-700 mb-4">{{ question.question }}</p>
+                        
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-sm text-gray-600 mb-2">Your Answer:</p>
+                            {% set user_answer = user_answers.get(loop.index0|string) %}
+                            
+                            {% if question.type == 'code_writing' %}
+                                {% if user_answer %}
+                                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto mt-2">
+                                        <pre>{{ user_answer }}</pre>
+                                    </div>
+                                {% else %}
+                                    <p class="text-red-600 font-medium">No code provided</p>
+                                {% endif %}
+                            {% elif question.type == 'code_analysis' %}
+                                {% if question.code or question.code_snippet %}
+                                <div class="mb-3">
+                                    <p class="text-sm text-gray-600 mb-2">Code to analyze:</p>
+                                    <div class="bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                                        <pre>{{ question.code or question.code_snippet }}</pre>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% if question.options and question.options|length > 0 %}
+                                    {% if user_answer %}
+                                        <p class="font-medium text-gray-900">{{ user_answer }}</p>
+                                    {% else %}
+                                        <p class="text-red-600 font-medium">No answer selected</p>
+                                    {% endif %}
+                                {% else %}
+                                    {% if user_answer %}
+                                        <div class="bg-white p-3 rounded border">
+                                            <p class="text-gray-800 whitespace-pre-wrap">{{ user_answer }}</p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-red-600 font-medium">No answer provided</p>
+                                    {% endif %}
+                                {% endif %}
+                            {% elif question.type == 'code' %}
+                                {% if question.code_snippet %}
+                                <div class="mb-3">
+                                    <p class="text-sm text-gray-600 mb-2">Reference code:</p>
+                                    <div class="bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                                        <pre>{{ question.code_snippet }}</pre>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% if user_answer %}
+                                    <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto mt-2">
+                                        <pre>{{ user_answer }}</pre>
+                                    </div>
+                                {% else %}
+                                    <p class="text-red-600 font-medium">No code provided</p>
+                                {% endif %}
+                            {% else %}
+                                <!-- Default handling for other question types -->
+                                {% if user_answer %}
+                                    {% if user_answer | length > 100 or '\n' in user_answer %}
+                                        <div class="bg-white p-3 rounded border">
+                                            <p class="text-gray-800 whitespace-pre-wrap">{{ user_answer }}</p>
+                                        </div>
+                                    {% else %}
+                                        <p class="font-medium text-gray-900">{{ user_answer }}</p>
+                                    {% endif %}
+                                {% else %}
+                                    <p class="text-red-600 font-medium">Not answered</p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Final Submission -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200">
+            <div class="p-6">
+                <div class="text-center">
+                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-paper-plane text-red-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Ready to Submit?</h3>
+                    <p class="text-gray-600 mb-6">
+                        Make sure all questions are answered. You need 70% to pass.
+                    </p>
+                    
+                    <form method="POST" action="{{ url_for('submit_final_exam', course_id=course.id) }}" 
+                          onsubmit="return confirm('Are you sure you want to submit your final exam? This cannot be undone.')">
+                        <div class="flex justify-center space-x-4">
+                            <a href="{{ url_for('final_exam_question', course_id=course.id, question_num=1) }}" 
+                               class="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                <i class="fas fa-arrow-left mr-2"></i>Go Back
+                            </a>
+                            <button type="submit" 
+                                    class="px-8 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-medium">
+                                <i class="fas fa-paper-plane mr-2"></i>Submit Final Exam
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Important Notice -->
+        <div class="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div class="flex items-start">
+                <i class="fas fa-exclamation-triangle text-amber-600 mt-1 mr-3"></i>
+                <div>
+                    <h3 class="font-semibold text-amber-900 mb-1">Important Notice</h3>
+                    <p class="text-sm text-amber-800">
+                        Once you submit your final exam, you cannot change your answers. 
+                        Make sure you've reviewed all questions carefully.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

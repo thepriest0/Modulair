@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Certificate - {{ course.title }} - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
+        <p class="text-lg text-gray-600">You have successfully completed {{ course.title }}</p>
+    </div>
+
+    <!-- Certificate -->
+    <div class="certificate-container bg-white rounded-xl shadow-2xl p-12 mb-8 border-4 border-gradient-to-r from-blue-500 to-green-500">
+        <div class="text-center">
+            <!-- Certificate Header -->
+            <div class="mb-8">
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-certificate text-white text-3xl"></i>
+                </div>
+                <h2 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent mb-2">
+                    Certificate of Completion
+                </h2>
+                <div class="w-32 h-1 bg-gradient-to-r from-blue-500 to-green-500 mx-auto"></div>
+            </div>
+
+            <!-- Certificate Content -->
+            <div class="mb-8">
+                <p class="text-lg text-gray-600 mb-6">This is to certify that</p>
+                <h3 class="text-3xl font-bold text-gray-900 mb-6">{{ current_user.get_full_name() or current_user.username }}</h3>
+                <p class="text-lg text-gray-600 mb-2">has successfully completed the course</p>
+                <h4 class="text-2xl font-semibold text-gray-800 mb-6">{{ course.title }}</h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600">Topic</p>
+                        <p class="font-semibold text-gray-800">{{ course.topic }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600">Level</p>
+                        <p class="font-semibold text-gray-800">{{ course.proficiency }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600">Completion Date</p>
+                        <p class="font-semibold text-gray-800">{{ completion_date.strftime('%B %d, %Y') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certificate Footer -->
+            <div class="border-t border-gray-200 pt-6">
+                <div class="flex items-center justify-between">
+                    <div class="text-left">
+                        <div class="w-32 h-0.5 bg-gray-400 mb-2"></div>
+                        <p class="text-sm text-gray-600">ModulAIr Platform</p>
+                        <p class="text-xs text-gray-500">AI-Powered Learning</p>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-graduation-cap text-white text-xl"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="font-bold text-gray-900">ModulAIr</p>
+                            <p class="text-sm text-gray-600">Certificate ID: {{ course.id }}-{{ completion_date.strftime('%Y%m%d') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="text-center space-y-4 print-hide">
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <button onclick="window.print()" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105">
+                <i class="fas fa-print mr-2"></i>
+                Print Certificate
+            </button>
+            <a href="{{ url_for('my_courses') }}" class="inline-flex items-center px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fas fa-books mr-2"></i>
+                View My Courses
+            </a>
+            <a href="{{ url_for('create_course') }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105">
+                <i class="fas fa-plus mr-2"></i>
+                Create New Course
+            </a>
+        </div>
+    </div>
+
+    <!-- Achievement Stats -->
+    <div class="mt-12 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-8 print-hide">
+        <h3 class="text-xl font-semibold text-gray-900 mb-6 text-center">Course Achievement</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-book text-blue-600"></i>
+                </div>
+                <p class="text-sm text-gray-600">Lessons Completed</p>
+                <p class="text-xl font-bold text-gray-900">{{ lessons_count }}</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-check-circle text-green-600"></i>
+                </div>
+                <p class="text-sm text-gray-600">Quiz Score</p>
+                <p class="text-xl font-bold text-gray-900">{{ final_exam_score }}%</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-clock text-purple-600"></i>
+                </div>
+                <p class="text-sm text-gray-600">Time Invested</p>
+                <p class="text-xl font-bold text-gray-900">Study Time</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-star text-yellow-600"></i>
+                </div>
+                <p class="text-sm text-gray-600">Achievement</p>
+                <p class="text-xl font-bold text-gray-900">Certified</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Section -->
+    <div class="mt-8 text-center print-hide">
+        <p class="text-gray-600 mb-4">Share your achievement!</p>
+        <div class="flex justify-center space-x-4">
+            <a href="#" class="text-blue-600 hover:text-blue-700">
+                <i class="fab fa-linkedin text-xl"></i>
+            </a>
+            <a href="#" class="text-blue-400 hover:text-blue-500">
+                <i class="fab fa-twitter text-xl"></i>
+            </a>
+            <a href="#" class="text-blue-800 hover:text-blue-900">
+                <i class="fab fa-facebook text-xl"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    /* Hide navigation, footer, and non-certificate elements */
+    nav, footer, .no-print, .print-hide {
+        display: none !important;
+    }
+    
+    /* Preserve page structure but hide non-certificate content */
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    /* Keep certificate in its original position and styling */
+    .certificate-container {
+        box-shadow: none !important;
+        border: 2px solid #000 !important;
+        margin: 0 !important;
+        page-break-inside: avoid;
+    }
+    
+    /* Preserve all certificate styling exactly as designed */
+    .certificate-container * {
+        color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    /* Ensure gradients and colors are preserved */
+    .bg-gradient-to-r,
+    .bg-gradient-to-br,
+    .bg-clip-text,
+    .text-transparent {
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    /* Set appropriate page margins */
+    @page {
+        margin: 0.5in;
+        size: A4;
+    }
+    
+    /* Hide everything else but keep page flow */
+    .max-w-4xl > *:not(.certificate-container) {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}

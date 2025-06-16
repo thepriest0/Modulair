@@ -1,0 +1,147 @@
+Prompt for Building an AI-Driven Ed-Tech Web App in Replit
+I want to build a fully functional, mobile-responsive web app in Replit for an ed-tech platform, like a modern version of Coursera or Udemy, but with AI instructors creating personalized tech courses (e.g., coding, AI, cybersecurity). The app should use HTML, CSS, JavaScript, Python Flask, and the GPT API from GitHub Marketplace (using the Azure AI Inference SDK setup). The design should be sleek, clean, and professional, inspired by Coursera’s modern UI—think intuitive navigation, vibrant buttons, and a responsive dashboard that works on mobile and desktop. Below is the detailed setup and functionality I need.
+Project Overview
+The app is a dashboard where users can create custom tech courses. Instead of pre-made courses, users pick a topic (e.g., Python, web dev), their proficiency (beginner, intermediate, advanced), and learning style (videos, text, hands-on projects). The AI (powered by GPT via GitHub Marketplace) generates a tailored course outline, lessons, resources (including video links), quizzes, and tests. Users review the outline, start the course, and track progress, with tests they must pass to proceed. Progress is saved, and they earn a certificate upon completion.
+Technical Requirements
+
+Environment Setup in Replit:
+
+Use Python Flask for the backend to handle routes, API calls, and session management.
+Use HTML, CSS, and JavaScript for the frontend, with a mobile-responsive design.
+Integrate the GPT API using the Azure AI Inference SDK (Python >=3.8).
+Set up an environment variable for the GitHub token as shown:export GITHUB_TOKEN="<your-github-token-goes-here>"
+
+
+Install dependencies:pip install azure-ai-inference flask
+
+
+Use the following API setup for GPT:import os
+from azure.ai.inference import ChatCompletionsClient
+from azure.ai.inference.models import SystemMessage, UserMessage
+from azure.core.credentials import AzureKeyCredential
+
+endpoint = "https://models.github.ai/inference"
+model = "openai/gpt-4.1-nano"
+token = os.environ["GITHUB_TOKEN"]
+
+client = ChatCompletionsClient(
+    endpoint=endpoint,
+    credential=AzureKeyCredential(token),
+)
+
+
+
+
+Frontend Design:
+
+Create a modern, Coursera-inspired UI with a clean dashboard, bold typography, and vibrant call-to-action buttons (e.g., “Create a Course”).
+Use a CSS framework like Tailwind CSS (via CDN) for responsive design and fast styling.
+Ensure mobile responsiveness with a hamburger menu for small screens, fluid layouts, and touch-friendly buttons.
+Key UI components:
+Dashboard with a “What do you want to learn today?” prompt and a “Create a Course” button.
+Course creation flow: Step-by-step forms for selecting topic, proficiency, and learning style.
+Course preview page showing the AI-generated outline, lessons, and resources.
+Course progress page with a progress bar, lesson navigation, and quiz/test interfaces.
+Certificate display upon completion.
+
+
+
+
+Backend Functionality (Flask):
+
+Routes:
+/: Home page with the dashboard.
+/create-course: Form for users to input topic, proficiency, and learning style.
+/preview-course: Display AI-generated course outline and details.
+/start-course: Initialize the course and begin progress tracking.
+/course/<course_id>: Display course content, lessons, and quizzes.
+/submit-quiz/<course_id>: Handle quiz/test submissions and enforce passing to proceed.
+/certificate/<course_id>: Generate and display a certificate upon completion.
+
+
+Use Flask sessions to track user progress and store course data.
+Store course data (e.g., outlines, progress) in a simple SQLite database or JSON file in Replit.
+
+
+AI Integration:
+
+Use the GPT API to generate:
+Course outline based on user inputs (topic, proficiency, learning style).
+Lesson content, including text explanations, resource links (e.g., YouTube videos for tutorials), and code snippets for hands-on exercises.
+Quizzes and tests with questions and answers, ensuring tests require a passing score to unlock the next lesson.
+
+
+Example GPT prompt for course generation:response = client.complete(
+    messages=[
+        SystemMessage("You are an expert AI instructor creating a personalized tech course. Generate a detailed course outline, lessons, resources (including video links), and quizzes based on the user's topic, proficiency, and learning style."),
+        UserMessage(f"Create a course for {topic} at {proficiency} level, tailored for {learning_style} learning style. Include an outline, lesson content, resource links (e.g., YouTube videos), and at least one quiz with answers.")
+    ],
+    temperature=0.7,
+    top_p=0.9,
+    model=model
+)
+
+
+Parse the AI response to structure the course (e.g., JSON format for outline, lessons, quizzes).
+
+
+Features:
+
+Course Creation Flow:
+Step 1: User selects a topic from a dropdown (e.g., Python, Web Dev, Cybersecurity) or types a custom one.
+Step 2: User picks proficiency (Beginner, Intermediate, Advanced).
+Step 3: User selects learning style (Videos, Text, Hands-on Projects).
+Step 4: AI generates and displays a course preview (outline, lesson titles, resources).
+Step 5: User clicks “Start Course” to begin.
+
+
+Course Experience:
+Lessons include text, code snippets, and embedded video links (e.g., YouTube iframes for tutorials).
+Quizzes/tests with multiple-choice or coding questions; users must pass tests to proceed.
+Progress bar showing completion percentage.
+Ability to pause and resume anytime, with progress saved.
+
+
+Certificate: Generate a simple certificate (HTML/CSS) with the user’s name, course title, and completion date.
+
+
+Design Inspiration:
+
+Mimic Coursera’s clean layout: white background, bold headers, blue/green accents for buttons, and a sidebar for navigation.
+Use Tailwind CSS for styling (include via CDN: https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css).
+Ensure fonts are readable (e.g., Inter or Roboto via Google Fonts).
+Mobile: Stack elements vertically, use a hamburger menu, and ensure buttons are large enough for touch.
+
+
+Bonus Features (if feasible):
+
+Add a chat interface for users to ask the AI follow-up questions about the course content.
+Suggest related topics based on user progress (e.g., “Finished Python? Try Data Science!”).
+Include a “My Courses” section to view all active/completed courses.
+
+
+Replit Setup:
+
+Create a new Replit project with Python.
+Set up Flask with a main.py for the backend.
+Create an index.html for the dashboard and additional templates (create_course.html, preview_course.html, course.html, etc.).
+Use a static/ folder for CSS/JS and a templates/ folder for HTML.
+Configure Replit’s .replit file to run python main.py.
+Ensure the app is publicly accessible via Replit’s web hosting.
+
+
+Deliverables:
+
+A complete Replit project with:
+main.py: Flask backend with routes and GPT API integration.
+templates/: HTML files for dashboard, course creation, preview, and course pages.
+static/css/style.css: Custom CSS with Tailwind for styling.
+static/js/script.js: JavaScript for dynamic frontend interactions (e.g., form submissions, quiz handling).
+SQLite/JSON file for storing course data.
+
+
+A README with setup instructions, including how to set the GITHUB_TOKEN and run the app.
+
+
+
+This should result in a beautiful, functional, Coursera-like web app that brings my vision to life. Make sure it’s easy to use, looks modern, and works perfectly on mobile and desktop. Let’s do this!

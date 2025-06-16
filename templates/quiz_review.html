@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Review Your Answers - {{ quiz.title }} - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 py-8">
+    <div class="max-w-4xl mx-auto px-4">
+        <!-- Header -->
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <a href="{{ url_for('quiz_question', quiz_id=quiz.id, question_num=questions|length) }}" 
+                   class="text-blue-600 hover:text-blue-800 flex items-center">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Last Question
+                </a>
+                <div class="text-sm text-gray-600">
+                    Review All Answers
+                </div>
+            </div>
+
+            <h1 class="text-3xl font-bold text-gray-900">{{ quiz.title }}</h1>
+            <p class="text-lg text-gray-600 mt-2">Review your answers before submitting</p>
+        </div>
+
+        <!-- Review Card -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Your Answers</h2>
+
+            {% for question in questions %}
+                <div class="mb-6 pb-6 {% if not loop.last %}border-b border-gray-200{% endif %}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h3 class="font-medium text-gray-900 mb-3">
+                                {{ loop.index }}. {{ question.question }}
+                            </h3>
+
+                            {% if question.type == 'multiple_choice' %}
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    <p class="font-medium text-blue-900">
+                                        {{ user_answers.get(loop.index0|string) or 'No answer selected' }}
+                                    </p>
+                                </div>
+                            {% elif question.type == 'true_false' %}
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    <p class="font-medium text-blue-900">
+                                        {{ user_answers.get(loop.index0|string) or 'No answer selected' }}
+                                    </p>
+                                </div>
+                            {% elif question.type == 'fill_blank' %}
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    <p class="font-medium text-blue-900 italic">
+                                        "{{ user_answers.get(loop.index0|string) or 'No answer provided' }}"
+                                    </p>
+                                </div>
+                            {% elif question.type == 'short_answer' %}
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    <div class="bg-gray-50 p-3 rounded-lg border">
+                                        <p class="text-gray-800 whitespace-pre-wrap">{{ user_answers.get(loop.index0|string) or 'No answer provided' }}</p>
+                                    </div>
+                                </div>
+                            {% elif question.type == 'code_writing' %}
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your code:</p>
+                                    {% set user_code = user_answers.get(loop.index0|string) %}
+                                    {% if user_code %}
+                                        <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                                            <pre>{{ user_code }}</pre>
+                                        </div>
+                                    {% else %}
+                                        <div class="bg-gray-100 p-3 rounded-lg border">
+                                            <p class="text-gray-500 italic">No code provided</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% elif question.type == 'code_analysis' %}
+                                <div class="ml-4">
+                                    {% if question.code or question.code_snippet %}
+                                    <div class="mb-3">
+                                        <p class="text-sm text-gray-600 mb-2">Code to analyze:</p>
+                                        <div class="bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                                            <pre>{{ question.code or question.code_snippet }}</pre>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    {% if question.options and question.options|length > 0 %}
+                                        <p class="font-medium text-blue-900">
+                                            {{ user_answers.get(loop.index0|string) or 'No answer selected' }}
+                                        </p>
+                                    {% else %}
+                                        <div class="bg-gray-50 p-3 rounded-lg border">
+                                            <p class="text-gray-800 whitespace-pre-wrap">{{ user_answers.get(loop.index0|string) or 'No answer provided' }}</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% elif question.type == 'code' %}
+                                <div class="ml-4">
+                                    {% if question.code_snippet %}
+                                    <div class="mb-3">
+                                        <p class="text-sm text-gray-600 mb-2">Reference code:</p>
+                                        <div class="bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                                            <pre>{{ question.code_snippet }}</pre>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    {% set user_answer = user_answers.get(loop.index0|string) %}
+                                    {% if user_answer %}
+                                        <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                                            <pre>{{ user_answer }}</pre>
+                                        </div>
+                                    {% else %}
+                                        <div class="bg-gray-100 p-3 rounded-lg border">
+                                            <p class="text-gray-500 italic">No answer provided</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <!-- Default fallback for any unrecognized question type -->
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 mb-2">Your answer:</p>
+                                    {% set user_answer = user_answers.get(loop.index0|string) %}
+                                    {% if question.options %}
+                                        <p class="font-medium text-blue-900">
+                                            {{ user_answer or 'No answer selected' }}
+                                        </p>
+                                    {% else %}
+                                        {% if user_answer and (user_answer | length > 50 or '\n' in user_answer) %}
+                                            <div class="bg-gray-50 p-3 rounded-lg border">
+                                                <p class="text-gray-800 whitespace-pre-wrap">{{ user_answer }}</p>
+                                            </div>
+                                        {% else %}
+                                            <p class="font-medium text-blue-900 italic">
+                                                "{{ user_answer or 'No answer provided' }}"
+                                            </p>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <a href="{{ url_for('quiz_question', quiz_id=quiz.id, question_num=loop.index) }}" 
+                           class="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Edit
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Submission Info -->
+        <div class="bg-yellow-50 rounded-lg p-6 mb-6">
+            <div class="flex items-start">
+                <i class="fas fa-info-circle text-yellow-600 mt-1 mr-3"></i>
+                <div>
+                    <h3 class="font-semibold text-yellow-900 mb-2">Before You Submit</h3>
+                    <ul class="text-sm text-yellow-800 space-y-1">
+                        <li>• You must answer all questions correctly to pass</li>
+                        <li>• AI will grade your answers intelligently</li>
+                        <li>• Make sure all questions are answered before submitting</li>
+                        <li>• You can still go back and change your answers</li>
+                        <li>• If you don't pass, you can retake the quiz</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{{ url_for('quiz_question', quiz_id=quiz.id, question_num=1) }}" 
+               class="px-8 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-center">
+                <i class="fas fa-edit mr-2"></i>
+                Review Questions Again
+            </a>
+
+            <form method="POST" action="{{ url_for('submit_quiz', quiz_id=quiz.id) }}" class="inline">
+                <button type="submit" 
+                        class="w-full px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105 shadow-lg">
+                    <i class="fas fa-paper-plane mr-2"></i>
+                    Submit Quiz
+                </button>
+            </form>
+        </div>
+
+        <!-- Answer Count -->
+        <div class="text-center mt-4">
+            <p class="text-sm text-gray-600">
+                {% set answered_count = user_answers.values() | reject('equalto', '') | list | length %}
+                Answered: {{ answered_count }} of {{ questions|length }} questions
+                {% if answered_count < questions|length %}
+                    <span class="text-red-600 font-medium">({{ questions|length - answered_count }} remaining)</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

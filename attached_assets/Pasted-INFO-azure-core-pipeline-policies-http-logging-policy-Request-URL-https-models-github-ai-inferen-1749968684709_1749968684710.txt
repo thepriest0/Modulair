@@ -1,0 +1,94 @@
+INFO:azure.core.pipeline.policies.http_logging_policy:Request URL: 'https://models.github.ai/inference/chat/completions?api-version=REDACTED'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '2772'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': '2570e95a-49b1-11f0-b158-656429b70ca4'
+    'api-key': 'REDACTED'
+    'User-Agent': 'azsdk-python-ai-inference/1.0.0b9 Python/3.11.10 (Linux-6.2.16-x86_64-with-glibc2.40)'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+DEBUG:urllib3.connectionpool:Starting new HTTPS connection (1): models.github.ai:443
+DEBUG:urllib3.connectionpool:https://models.github.ai:443 "POST /inference/chat/completions?api-version=2024-05-01-preview HTTP/1.1" 429 267
+INFO:azure.core.pipeline.policies.http_logging_policy:Response status: 429
+Response headers:
+    'azureml-served-by-cluster': 'REDACTED'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Date': 'Sun, 15 Jun 2025 06:22:43 GMT'
+    'request-context': 'REDACTED'
+    'Retry-After': '39725'
+    'Server': 'models-gateway'
+    'Strict-Transport-Security': 'REDACTED'
+    'Vary': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'x-ms-error-code': 'RateLimitReached'
+    'x-ratelimit-timeremaining': 'REDACTED'
+    'x-ratelimit-type': 'REDACTED'
+    'x-request-time': 'REDACTED'
+    'Content-Length': '267'
+    'x-github-backend': 'REDACTED'
+    'X-GitHub-Request-Id': 'REDACTED'
+[2025-06-15 06:23:14 +0000] [73] [CRITICAL] WORKER TIMEOUT (pid:94)
+[2025-06-15 06:23:14 +0000] [94] [ERROR] Error handling request /generate-course-content
+Traceback (most recent call last):
+  File "/home/runner/workspace/ai_service.py", line 112, in generate_course
+    response = future.result(timeout=20)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10/lib/python3.11/concurrent/futures/_base.py", line 458, in result
+    raise TimeoutError()
+TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/ai_service.py", line 114, in generate_course
+    raise Exception("AI request timed out after 20 seconds. The GitHub AI service may be overloaded. Please try again in a few minutes.")
+Exception: AI request timed out after 20 seconds. The GitHub AI service may be overloaded. Please try again in a few minutes.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/gunicorn/workers/sync.py", line 134, in handle
+    self.handle_request(listener, req, client, addr)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/gunicorn/workers/sync.py", line 177, in handle_request
+    respiter = self.wsgi(environ, resp.start_response)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1536, in __call__
+    return self.wsgi_app(environ, start_response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/middleware/proxy_fix.py", line 183, in __call__
+    return self.app(environ, start_response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/app.py", line 230, in generate_course_content
+    course_data = ai_service.generate_course(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/ai_service.py", line 108, in generate_course
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+  File "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10/lib/python3.11/concurrent/futures/_base.py", line 647, in __exit__
+    self.shutdown(wait=True)
+  File "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10/lib/python3.11/concurrent/futures/thread.py", line 235, in shutdown
+    t.join()
+  File "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10/lib/python3.11/threading.py", line 1119, in join
+    self._wait_for_tstate_lock()
+  File "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10/lib/python3.11/threading.py", line 1139, in _wait_for_tstate_lock
+    if lock.acquire(block, timeout):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/gunicorn/workers/base.py", line 204, in handle_abort
+    sys.exit(1)
+SystemExit: 1
+[2025-06-15 06:23:14 +0000] [94] [INFO] Worker exiting (pid: 94)
+[2025-06-15 06:23:14 +0000] [113] [INFO] Booting worker with pid: 113
+User table columns: ['id', 'username', 'email', 'password_hash', 'first_name', 'last_name', 'created_at', 'active']

@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Course Header -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="mb-4 md:mb-0">
+                <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ course.title }}</h1>
+                <p class="text-gray-600">{{ course.description }}</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {{ course.proficiency }}
+                </span>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    {{ course.learning_style }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-6">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Course Progress</span>
+                <span class="text-sm font-medium text-gray-700">{{ progress.completion_percentage }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300" style="width: {{ progress.completion_percentage }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <!-- Lesson Sidebar -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Course Lessons</h3>
+                <!-- Mobile Toggle Button -->
+                <button type="button" class="block sm:hidden w-full mb-4 bg-blue-100 text-blue-800 py-2 px-4 rounded-lg font-medium text-center hover:bg-blue-200 transition-colors" onclick="toggleLessons()">
+                    <span id="lessons-toggle-text">Show Lessons</span>
+                </button>
+                <!-- Collapsible Lessons List -->
+                <div id="lessons-list" class="space-y-2 hidden sm:block">
+                    {% for lesson in lessons %}
+                    {% set is_unlocked = loop.index0 <= progress.current_lesson %}
+                    {% set is_completed = loop.index0 < progress.current_lesson %}
+                    {% set is_current = loop.index0 == progress.current_lesson %}
+                    <div class="p-3 rounded-lg {% if is_current %}bg-blue-50 border-2 border-blue-200{% elif is_completed %}bg-green-50 border border-green-200{% else %}bg-gray-50 border border-gray-200{% endif %} {% if is_unlocked %}cursor-pointer hover:shadow-md transition-all{% else %}cursor-not-allowed{% endif %}"
+                         {% if is_unlocked %}onclick="navigateToLesson({{ course.id }}, {{ loop.index0 }})"{% endif %}>
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 mr-3">
+                                {% if is_completed %}
+                                <i class="fas fa-check-circle text-green-500"></i>
+                                {% elif is_current %}
+                                <i class="fas fa-play-circle text-blue-500"></i>
+                                {% else %}
+                                <i class="fas fa-{% if is_unlocked %}circle{% else %}lock{% endif %} text-gray-300"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium {% if is_unlocked %}text-gray-900{% else %}text-gray-400{% endif %} truncate">
+                                    {{ loop.index }}. {{ lesson.title }}
+                                </p>
+                                {% if not is_unlocked %}
+                                <p class="text-xs text-gray-400 mt-1">Complete previous lessons to unlock</p>
+                                {% endif %}
+                            </div>
+                            {% if is_unlocked %}
+                            <div class="flex-shrink-0 ml-2">
+                                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <!-- Quiz Status (only show if quiz dependency matches this lesson) -->
+                        {% for quiz in quizzes %}
+                            {% if quiz.lesson_dependency == loop.index and quiz.lesson_id == lesson.id %}
+                            <div class="mt-4">
+                                {% set passed_attempt = current_user.quiz_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('passed', 'equalto', true)|first %}
+                                {% if passed_attempt %}
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-2"></i>{{ quiz.title }} - Passed
+                                </span>
+                                {% else %}
+                                <a href="{{ url_for('quiz', quiz_id=quiz.id) }}" class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                    <i class="fas fa-question-circle mr-2"></i>Take {{ quiz.title }}
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    {% if quizzes %}
+                        <h3 class="text-lg font-semibold mb-4">Quizzes & Assessments</h3>
+                        <div class="space-y-3">
+                            {% for quiz in quizzes %}
+                                <a href="{{ url_for('quiz', quiz_id=quiz.id) }}" class="w-full bg-yellow-100 text-yellow-800 py-2 px-4 rounded-lg font-medium text-center block hover:bg-yellow-200 transition-colors">
+                                    <i class="fas fa-question-circle mr-2"></i>
+                                    {{ quiz.title }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if assignments %}
+                        <h3 class="text-lg font-semibold mt-6 mb-4">Assignments</h3>
+                        <div class="space-y-3">
+                            <a href="{{ url_for('course_assignments', course_id=course.id) }}" class="w-full bg-blue-100 text-blue-800 py-2 px-4 rounded-lg font-medium text-center block hover:bg-blue-200 transition-colors">
+                                <i class="fas fa-tasks mr-2"></i>
+                                View All Assignments ({{ assignments|length }})
+                            </a>
+                        </div>
+                    {% endif %}
+
+                    {% if progress.completion_percentage >= 100 %}
+                        <div class="mt-6">
+                            <a href="{{ url_for('final_exam', course_id=course.id) }}" class="w-full bg-red-100 text-red-800 py-3 px-4 rounded-lg font-medium text-center block hover:bg-red-200 transition-colors">
+                                <i class="fas fa-graduation-cap mr-2"></i>
+                                Take Final Exam
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="lg:col-span-3">
+            {% if current_lesson %}
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">{{ current_lesson.title }}</h2>
+
+                    <!-- Lesson Content -->
+                    <div class="mb-8">
+
+
+                    <div class="prose max-w-none">
+                        {{ current_lesson.content|safe }}
+                    </div>
+                </div>
+
+                <!-- Resources -->
+                {% if current_lesson.resources %}
+                {% set resources = current_lesson.resources|from_json %}
+                {% if resources %}
+                <div class="mb-8">
+                    <!-- Embedded Videos -->
+                    {% set video_resources = resources | selectattr('type', 'equalto', 'video') | list %}
+                    {% if video_resources %}
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Video Resources</h3>
+                        {% for video in video_resources %}
+                        {% set is_youtube = 'youtube.com' in video.url or 'youtu.be' in video.url %}
+                        {% if is_youtube %}
+                            {% if 'youtube.com/watch?v=' in video.url %}
+                                {% set video_id = video.url.split('v=')[1].split('&')[0] %}
+                            {% elif 'youtu.be/' in video.url %}
+                                {% set video_id = video.url.split('youtu.be/')[1].split('?')[0] %}
+                            {% else %}
+                                {% set video_id = '' %}
+                            {% endif %}
+                            {% if video_id %}
+                            <div class="mb-6">
+                                <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
+                                <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
+                                    <iframe 
+                                        class="w-full"
+                                        style="height: 400px;"
+                                        src="https://www.youtube.com/embed/{{ video_id }}?rel=0&showinfo=0" 
+                                        title="{{ video.title }}"
+                                        frameborder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        allowfullscreen>
+                                    </iframe>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="mb-6">
+                                <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
+                                <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
+                                    <iframe 
+                                        class="w-full"
+                                        style="height: 400px;"
+                                        src="{{ video.url }}" 
+                                        title="{{ video.title }}"
+                                        frameborder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        allowfullscreen>
+                                    </iframe>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                        <div class="mb-6">
+                            <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
+                            <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
+                                <iframe 
+                                    class="w-full"
+                                    style="height: 400px;"
+                                    src="{{ video.url }}" 
+                                    title="{{ video.title }}"
+                                    frameborder="0" 
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                    allowfullscreen>
+                                </iframe>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Other Resources -->
+                    {% set other_resources = resources | rejectattr('type', 'equalto', 'video') | list %}
+                    {% if other_resources %}
+                    <div class="p-6 bg-gray-50 rounded-lg">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Resources</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for resource in other_resources %}
+                            <a href="{{ resource.url if resource.url != '#' else 'javascript:void(0)' }}" target="_blank" class="flex items-center p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex-shrink-0 mr-3">
+                                    <i class="fas fa-{% if resource.type == 'article' %}file-alt{% elif resource.type == 'documentation' %}book{% else %}link{% endif %} text-blue-500"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900">{{ resource.title }}</p>
+                                    <p class="text-xs text-gray-500">{{ resource.type|title }}</p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400"></i>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <!-- Navigation -->
+                <div class="flex items-center justify-between pt-6 border-t border-gray-200">
+                    <div>
+                        {% if progress.current_lesson > 0 %}
+                        <a href="{{ url_for('course_detail', course_id=course.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Previous
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600">
+                            Lesson {{ progress.current_lesson + 1 }} of {{ lessons|length }}
+                        </p>
+                    </div>
+
+                    <div>
+                        {% if progress.current_lesson < lessons|length - 1 %}
+                        <a href="{{ url_for('next_lesson', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-green-600 transition-all">
+                            Next Lesson
+                            <i class="fas fa-arrow-right ml-2"></i>
+                        </a>
+                        {% elif progress.completion_percentage >= 100 %}
+                        <a href="{{ url_for('certificate', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-blue-600 transition-all">
+                            Get Certificate
+                            <i class="fas fa-certificate ml-2"></i>
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('quiz', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-600 transition-all">
+                            Take Quiz
+                            <i class="fas fa-question-circle ml-2"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-trophy text-green-600 text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Course Completed!</h2>
+                <p class="text-gray-600 mb-6">Congratulations! You have successfully completed all lessons in this course.</p>
+                <a href="{{ url_for('certificate', course_id=course.id) }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105">
+                    <i class="fas fa-certificate mr-2"></i>
+                    Get Your Certificate
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

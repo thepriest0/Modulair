@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Account - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-md mx-auto">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-red-600">Delete Account</h1>
+            <p class="text-gray-600">This action cannot be undone</p>
+        </div>
+
+        <!-- Warning -->
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-red-400"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Warning</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p>Deleting your account will permanently remove:</p>
+                        <ul class="list-disc list-inside mt-2 space-y-1">
+                            <li>Your profile and personal information</li>
+                            <li>All your courses and progress</li>
+                            <li>Quiz attempts and assignment submissions</li>
+                            <li>Certificates and achievements</li>
+                            <li>All associated data</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <form method="POST" class="space-y-6">
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Confirm Your Password</label>
+                    <input type="password" id="password" name="password" required
+                           placeholder="Enter your current password"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
+                </div>
+
+                <div>
+                    <label for="confirm_delete" class="block text-sm font-medium text-gray-700">
+                        Type "DELETE" to confirm
+                    </label>
+                    <input type="text" id="confirm_delete" name="confirm_delete" required
+                           placeholder="DELETE"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
+                    <p class="mt-1 text-sm text-gray-500">This confirmation is required to proceed</p>
+                </div>
+
+                <!-- Final Warning -->
+                <div class="bg-gray-50 p-4 rounded-md">
+                    <p class="text-sm text-gray-700">
+                        <strong>This action is irreversible.</strong> Once you delete your account, 
+                        there is no way to recover your data. Please make sure you have downloaded 
+                        any important information before proceeding.
+                    </p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-between space-x-4 pt-6 border-t">
+                    <a href="{{ url_for('account_settings') }}" 
+                       class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            onclick="return confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.')"
+                            class="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
+                        Delete My Account
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Alternative Options -->
+        <div class="mt-6 bg-blue-50 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-blue-800 mb-2">Consider these alternatives:</h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• <a href="{{ url_for('account_settings') }}" class="underline">Disable notifications</a> instead of deleting</li>
+                <li>• <a href="{{ url_for('change_password') }}" class="underline">Change your password</a> if security is a concern</li>
+                <li>• Contact support if you're having technical issues</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const confirmDelete = document.getElementById('confirm_delete').value;
+    if (confirmDelete !== 'DELETE') {
+        e.preventDefault();
+        alert('Please type "DELETE" exactly to confirm account deletion.');
+        return false;
+    }
+});
+
+// Real-time validation for DELETE confirmation
+document.getElementById('confirm_delete').addEventListener('input', function() {
+    const deleteButton = document.querySelector('button[type="submit"]');
+    if (this.value === 'DELETE') {
+        deleteButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        deleteButton.disabled = false;
+    } else {
+        deleteButton.classList.add('opacity-50', 'cursor-not-allowed');
+        deleteButton.disabled = true;
+    }
+});
+
+// Initially disable delete button
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteButton = document.querySelector('button[type="submit"]');
+    deleteButton.classList.add('opacity-50', 'cursor-not-allowed');
+    deleteButton.disabled = true;
+});
+</script>
+{% endblock %}

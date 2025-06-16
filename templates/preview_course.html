@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Course Preview - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="container-wide mx-auto px-4 py-8">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-4">Course Preview</h1>
+        <p class="text-lg text-gray-600">Review your AI-generated course before starting</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Course Overview -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-2">
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ course.course_data.title }}</h2>
+                        <p class="text-gray-600">{{ course.course_data.description }}</p>
+                    </div>
+                    <div class="flex flex-row sm:flex-col gap-2 sm:items-end items-start mt-2 sm:mt-0">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            {{ course.proficiency }}
+                        </span>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            {{ course.learning_style }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Course Outline -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Course Outline</h3>
+                    <div class="space-y-2">
+                        {% for item in course.course_data.outline %}
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                            <span class="text-gray-800">{{ item }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Lessons Preview -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Lessons ({{ course.course_data.lessons|length }})</h3>
+                    <div class="space-y-4">
+                        {% for lesson in course.course_data.lessons %}
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900 mb-2">{{ loop.index }}. {{ lesson.title }}</h4>
+                            <p class="text-gray-600 text-sm mb-3">{{ lesson.content[:200] }}...</p>
+                            {% if lesson.resources %}
+                            <div class="flex flex-wrap gap-2">
+                                {% for resource in lesson.resources %}
+                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    <i class="fas fa-{% if resource.type == 'video' %}video{% elif resource.type == 'article' %}file-alt{% else %}link{% endif %} mr-1"></i>
+                                    {{ resource.type|title }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Quizzes Preview -->
+                {% if course.course_data.quizzes %}
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Assessments</h3>
+                    <div class="space-y-4">
+                        {% for quiz in course.course_data.quizzes %}
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900 mb-2">{{ quiz.title }}</h4>
+                            <p class="text-gray-600 text-sm">{{ quiz.questions|length }} questions • Passing score: 70%</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Course Details Sidebar -->
+        <div>
+            <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Course Details</h3>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-book text-blue-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Topic</p>
+                            <p class="font-medium text-gray-900">{{ course.topic }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <i class="fas fa-signal text-green-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Level</p>
+                            <p class="font-medium text-gray-900">{{ course.proficiency }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <i class="fas fa-brain text-purple-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Learning Style</p>
+                            <p class="font-medium text-gray-900">{{ course.learning_style }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-orange-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Estimated Duration</p>
+                            <p class="font-medium text-gray-900">{{ course.course_data.lessons|length * 2 }}-{{ course.course_data.lessons|length * 3 }} hours</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <i class="fas fa-tasks text-red-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Lessons</p>
+                            <p class="font-medium text-gray-900">{{ course.course_data.lessons|length }} lessons</p>
+                        </div>
+                    </div>
+                    
+                    {% if course.course_data.quizzes %}
+                    <div class="flex items-center">
+                        <i class="fas fa-question-circle text-yellow-500 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Quizzes</p>
+                            <p class="font-medium text-gray-900">{{ course.course_data.quizzes|length }} quiz{% if course.course_data.quizzes|length != 1 %}zes{% endif %}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-3">
+                    <form method="POST" action="{{ url_for('start_course') }}">
+                        <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105">
+                            <i class="fas fa-play mr-2"></i>
+                            Start Course
+                        </button>
+                    </form>
+                    
+                    <a href="{{ url_for('create_course') }}" class="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium text-center block hover:bg-gray-200 transition-colors">
+                        <i class="fas fa-edit mr-2"></i>
+                        Modify Course
+                    </a>
+                </div>
+
+                <!-- Course Features -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h4 class="font-medium text-gray-900 mb-3">What's Included</h4>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Interactive lessons
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Hands-on exercises
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Knowledge assessments
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Progress tracking
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Course certificate
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

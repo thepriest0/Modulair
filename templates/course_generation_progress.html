@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Generating Course - ModulAIr{% endblock %}
+
+{% block content %}
+<div class="container-wide mx-auto px-4 py-8">
+    <div class="bg-white rounded-xl shadow-lg p-8">
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-cog fa-spin text-white text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Generating Your Course</h1>
+            <p class="text-gray-600">AI is creating personalized content for your {{ params.topic }} course...</p>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="space-y-4 mb-8">
+            <div class="flex items-center">
+                <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-4">
+                    <i class="fas fa-check text-white text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-semibold text-gray-900">Course Parameters Set</h3>
+                    <p class="text-sm text-gray-600">Topic: {{ params.topic }} | Level: {{ params.proficiency }} | Style: {{ params.learning_style }}</p>
+                </div>
+            </div>
+
+            <div class="flex items-center" id="content-generation">
+                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+                    <i class="fas fa-cog fa-spin text-white text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-semibold text-gray-900">Generating Course Content</h3>
+                    <p class="text-sm text-gray-600">Creating 8+ lessons, quizzes, and assignments...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center opacity-50" id="lesson-creation">
+                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-4">
+                    <span class="text-gray-500 text-sm">3</span>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-semibold text-gray-900">Creating Lessons & Quizzes</h3>
+                    <p class="text-sm text-gray-600">Structuring content with interactive elements...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center opacity-50" id="finalization">
+                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-4">
+                    <span class="text-gray-500 text-sm">4</span>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-semibold text-gray-900">Finalizing Course</h3>
+                    <p class="text-sm text-gray-600">Adding final touches and quality checks...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mb-6">
+            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Progress</span>
+                <span id="progress-percentage">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500" id="progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="text-center text-gray-600">
+            <p class="mb-2">This may take 3-5 minutes...</p>
+            <p class="text-sm">Please don't close this page while your course is being generated.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentStep = 1;
+let progressInterval;
+
+function startGeneration() {
+    let progressBar = document.getElementById('progress-bar');
+    let statusText = document.querySelector('.text-center p');
+
+    // Start course generation
+    fetch('/start-course-generation')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusText.textContent = 'Generation started...';
+                // Start polling for status
+                pollGenerationStatus();
+            } else {
+                statusText.textContent = `Error: ${data.error}`;
+                statusText.className = 'text-red-600 text-center mt-4';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusText.textContent = 'Network error: ' + error.message;
+            statusText.className = 'text-red-600 text-center mt-4';
+        });
+
+    function pollGenerationStatus() {
+        fetch('/check-generation-status')
+            .then(response => response.json())
+            .then(data => {
+                progressBar.style.width = data.progress + '%';
+                document.getElementById('progress-percentage').textContent = data.progress + '%';
+                statusText.textContent = data.message;
+
+                if (data.status === 'completed') {
+                    statusText.textContent = 'Course generated successfully!';
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url;
+                    }, 1000);
+                } else if (data.status === 'error') {
+                    statusText.textContent = `Error: ${data.message}`;
+                    statusText.className = 'text-red-600 text-center mt-4';
+                } else {
+                    // Continue polling
+                    setTimeout(pollGenerationStatus, 2000);
+                }
+            })
+            .catch(error => {
+                console.error('Status check error:', error);
+                statusText.textContent = 'Error checking status: ' + error.message;
+                statusText.className = 'text-red-600 text-center mt-4';
+            });
+    }
+}
+
+function updateSteps() {
+    if (currentStep >= 4) {
+        clearInterval(progressInterval);
+        return;
+    }
+
+    currentStep++;
+    const stepIds = ['content-generation', 'lesson-creation', 'finalization'];
+    const stepId = stepIds[currentStep - 2];
+
+    if (stepId) {
+        // Update previous step to completed
+        const prevStep = document.getElementById(stepIds[currentStep - 3]);
+        if (prevStep) {
+            const icon = prevStep.querySelector('.rounded-full');
+            icon.className = 'w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-4';
+            icon.innerHTML = '<i class="fas fa-check text-white text-sm"></i>';
+            prevStep.classList.remove('opacity-50');
+        }
+
+        // Update current step to active
+        const currentStepEl = document.getElementById(stepId);
+        if (currentStepEl) {
+            const icon = currentStepEl.querySelector('.rounded-full');
+            icon.className = 'w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-4';
+            icon.innerHTML = '<i class="fas fa-cog fa-spin text-white text-sm"></i>';
+            currentStepEl.classList.remove('opacity-50');
+        }
+
+        // Update progress bar
+        const progress = (currentStep / 4) * 100;
+        updateProgress(progress);
+    }
+}
+
+function updateProgress(percentage, message) {
+    document.getElementById('progress-bar').style.width = percentage + '%';
+    document.getElementById('progress-percentage').textContent = percentage + '%';
+    if (message) {
+        document.querySelector('.text-center p').textContent = message;
+    }
+}
+
+function showError(message) {
+    clearInterval(progressInterval);
+    const container = document.querySelector('.bg-white.rounded-xl');
+    container.innerHTML = `
+        <div class="text-center py-8">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-red-500 text-2xl"></i>
+            </div>
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Generation Failed</h2>
+            <p class="text-gray-600 mb-6">${message}</p>
+            <a href="/create-course" class="inline-flex items-center bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Try Again
+            </a>
+        </div>
+    `;
+}
+
+// Start generation when page loads
+document.addEventListener('DOMContentLoaded', startGeneration);
+</script>
+{% endblock %}
