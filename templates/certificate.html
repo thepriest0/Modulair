@@ -10,8 +10,22 @@
     </div>
 
     <!-- Certificate -->
-    <div class="certificate-container bg-white rounded-xl shadow-2xl p-12 mb-8 border-4 border-gradient-to-r from-blue-500 to-green-500">
+    <div class="certificate-container enhanced-certificate bg-white rounded-xl shadow-2xl p-12 mb-8">
         <div class="text-center">
+            <!-- Watermark/Seal -->
+            <div class="certificate-watermark">
+                <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="150" cy="150" r="120" fill="url(#goldGradient)" fill-opacity="0.08" />
+                    <text x="50%" y="54%" text-anchor="middle" fill="#bfa14a" fill-opacity="0.12" font-size="48" font-weight="bold" font-family="serif">ModulAIr</text>
+                    <defs>
+                        <linearGradient id="goldGradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#FFD700"/>
+                            <stop offset="100%" stop-color="#FFB300"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+
             <!-- Certificate Header -->
             <div class="mb-8">
                 <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -48,20 +62,19 @@
 
             <!-- Certificate Footer -->
             <div class="border-t border-gray-200 pt-6">
-                <div class="flex items-center justify-between">
-                    <div class="text-left">
-                        <div class="w-32 h-0.5 bg-gray-400 mb-2"></div>
-                        <p class="text-sm text-gray-600">ModulAIr Platform</p>
-                        <p class="text-xs text-gray-500">AI-Powered Learning</p>
-                    </div>
-                    <div class="flex items-center">
-                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center mr-4">
+                <div class="footer-row flex flex-col sm:flex-row items-end justify-between mt-8 gap-8 w-full">
+                    <div class="footer-info flex items-center gap-4">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
                             <i class="fas fa-graduation-cap text-white text-xl"></i>
                         </div>
                         <div class="text-left">
-                            <p class="font-bold text-gray-900">ModulAIr</p>
-                            <p class="text-sm text-gray-600">Certificate ID: {{ course.id }}-{{ completion_date.strftime('%Y%m%d') }}</p>
+                            <p class="font-bold text-gray-900 mb-0">ModulAIr</p>
+                            <p class="text-sm text-gray-600 mb-0">Certificate ID: {{ course.id }}-{{ completion_date.strftime('%Y%m%d') }}</p>
                         </div>
+                    </div>
+                    <div class="signature-area flex flex-col items-end">
+                        <div class="signature-line"></div>
+                        <span class="signature-label text-xs text-gray-500 mt-1">Authorized Signature</span>
                     </div>
                 </div>
             </div>
@@ -140,33 +153,40 @@
 
 <style>
 @media print {
-    /* Hide navigation, footer, and non-certificate elements */
     nav, footer, .no-print, .print-hide {
         display: none !important;
     }
-    
-    /* Preserve page structure but hide non-certificate content */
     body {
         background: white !important;
         color: black !important;
     }
-    
-    /* Keep certificate in its original position and styling */
     .certificate-container {
         box-shadow: none !important;
         border: 2px solid #000 !important;
         margin: 0 !important;
-        page-break-inside: avoid;
+        padding: 0.5cm !important;
+        height: auto !important;
+        min-height: unset !important;
+        max-height: 100% !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        overflow: visible !important;
+        position: relative;
+        box-sizing: border-box !important;
+        background-color: #fff !important;
+        background-image: url('data:image/svg+xml;utf8,<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="40" height="40" fill="%23fff"/><circle cx="20" cy="20" r="1.5" fill="%23e5e7eb"/><circle cx="0" cy="40" r="1.5" fill="%23e5e7eb"/><circle cx="40" cy="0" r="1.5" fill="%23e5e7eb"/></svg>') !important;
+        background-repeat: repeat !important;
+        font-size: 0.95em !important;
     }
-    
-    /* Preserve all certificate styling exactly as designed */
     .certificate-container * {
         color-adjust: exact !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
-    
-    /* Ensure gradients and colors are preserved */
     .bg-gradient-to-r,
     .bg-gradient-to-br,
     .bg-clip-text,
@@ -175,17 +195,89 @@
         color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
-    
-    /* Set appropriate page margins */
     @page {
         margin: 0.5in;
-        size: A4;
+        size: A4 landscape;
     }
-    
-    /* Hide everything else but keep page flow */
     .max-w-4xl > *:not(.certificate-container) {
         display: none !important;
     }
+    html, body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden !important;
+    }
+}
+
+/* Subtle patterned background for the certificate */
+.enhanced-certificate {
+    position: relative;
+    background-color: #fff;
+    /* SVG pattern background */
+    background-image: url('data:image/svg+xml;utf8,<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="40" height="40" fill="%23fff"/><circle cx="20" cy="20" r="1.5" fill="%23e5e7eb"/><circle cx="0" cy="40" r="1.5" fill="%23e5e7eb"/><circle cx="40" cy="0" r="1.5" fill="%23e5e7eb"/></svg>');
+    background-repeat: repeat;
+    border: 6px solid;
+    border-radius: 1.25rem;
+    border-image: linear-gradient(90deg, #FFD700 0%, #FFB300 100%);
+    border-image-slice: 1;
+    overflow: hidden;
+}
+
+/* Watermark/seal styling */
+.certificate-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    pointer-events: none;
+}
+.certificate-watermark svg {
+    width: 300px;
+    height: 300px;
+    opacity: 0.5;
+}
+
+/* Ensure content is above watermark */
+.enhanced-certificate > .text-center {
+    position: relative;
+    z-index: 1;
+}
+
+/* Signature area styling */
+.signature-area {
+    min-width: 180px;
+    margin-top: 32px;
+    align-items: flex-end;
+}
+.signature-line {
+    border-bottom: 2px solid #bfa14a;
+    width: 160px;
+    height: 32px;
+}
+.signature-label {
+    color: #bfa14a;
+    font-family: 'Dancing Script', cursive, serif;
+    font-size: 1rem;
+    letter-spacing: 1px;
+}
+
+.footer-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-top: 2rem;
+    gap: 2rem;
+}
+.footer-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.footer-info p {
+    margin-bottom: 0;
 }
 </style>
 {% endblock %}
