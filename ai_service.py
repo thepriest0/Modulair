@@ -8,9 +8,11 @@ from openai import OpenAI
 import re
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from models import CourseGeneration, db
 
 class AIService:
-    def __init__(self):
+    def __init__(self, app=None):
+        self.app = app
         self.a4f_api_key = os.environ.get("A4F_API_KEY", "default-key")
         self.a4f_base_url = "https://api.a4f.co/v1"
         self.model = "provider-5/gpt-4o"
@@ -43,78 +45,317 @@ class AIService:
             logging.error(f"Failed to initialize AI client: {str(e)}")
             self.client = None
 
-    def start_course_generation(self, topic, proficiency, learning_style, generation_id):
+    def _sanitize_json_content(self, content):
+        """Sanitize content to make it valid JSON by escaping control characters"""
+        if not content:
+            return content
+            
+        # Convert to string if needed
+        content = str(content)
+        
+        # Remove any leading/trailing whitespace
+        content = content.strip()
+        
+        # Handle common JSON extraction patterns
+        # Remove markdown code blocks
+        if '```json' in content:
+            start = content.find('```json') + 7
+            end = content.find('```', start)
+            if end == -1:
+                end = len(content)
+            content = content[start:end].strip()
+        elif '```' in content:
+            start = content.find('```') + 3
+            end = content.find('```', start)
+            if end == -1:
+                end = len(content)
+            content = content[start:end].strip()
+        
+        # Find the actual JSON object
+        brace_start = content.find('{')
+        brace_end = content.rfind('}')
+        if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
+            content = content[brace_start:brace_end + 1]
+        
+        # Now sanitize the content within the JSON using a more robust approach
+        def sanitize_json_strings(content):
+            """Sanitize JSON string values by properly escaping them"""
+            import re
+            
+            # This regex finds JSON string values and sanitizes them
+            def replace_string(match):
+                # Get the string value (without the surrounding quotes)
+                string_value = match.group(1)
+                
+                if not string_value:
+                    return '""'
+                
+                # Escape control characters and quotes
+                escaped = string_value.replace('\\', '\\\\')  # Escape backslashes first
+                escaped = escaped.replace('"', '\\"')         # Escape quotes
+                escaped = escaped.replace('\n', '\\n')        # Escape newlines
+                escaped = escaped.replace('\r', '\\r')        # Escape carriage returns
+                escaped = escaped.replace('\t', '\\t')        # Escape tabs
+                escaped = escaped.replace('\b', '\\b')        # Escape backspace
+                escaped = escaped.replace('\f', '\\f')        # Escape form feed
+                
+                # Remove any other control characters
+                escaped = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', escaped)
+                
+                return f'"{escaped}"'
+            
+            # Use a more sophisticated regex to find JSON string values
+            # This handles both simple strings and strings with escaped quotes
+            pattern = r'"((?:[^"\\]|\\.)*)"'
+            return re.sub(pattern, replace_string, content)
+        
+        # Apply the sanitization
+        content = sanitize_json_strings(content)
+        
+        return content
+
+    def _robust_json_parse(self, content, max_retries=3):
+        """Robust JSON parsing with multiple fallback strategies and retry mechanism"""
+        if not content:
+            raise Exception("Empty content provided for JSON parsing")
+        
+        content = str(content).strip()
+        
+        # Strategy 1: Try direct parsing first
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Direct JSON parsing failed: {str(e)}")
+        
+        # Strategy 2: Try with sanitization
+        try:
+            sanitized_content = self._sanitize_json_content(content)
+            return json.loads(sanitized_content)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Sanitized JSON parsing failed: {str(e)}")
+        
+        # Strategy 3: Try with more aggressive cleaning
+        try:
+            # Remove any potential markdown or extra formatting
+            cleaned_content = content
+            if cleaned_content.startswith('```'):
+                cleaned_content = cleaned_content[3:]
+            if cleaned_content.endswith('```'):
+                cleaned_content = cleaned_content[:-3]
+            cleaned_content = cleaned_content.strip()
+            
+            # Find JSON object boundaries
+            brace_start = cleaned_content.find('{')
+            brace_end = cleaned_content.rfind('}')
+            if brace_start != -1 and brace_end != -1:
+                cleaned_content = cleaned_content[brace_start:brace_end + 1]
+            
+            # Apply sanitization again
+            sanitized_content = self._sanitize_json_content(cleaned_content)
+            return json.loads(sanitized_content)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Aggressive cleaning JSON parsing failed: {str(e)}")
+        
+        # Strategy 4: Try with manual character replacement and structure fixing
+        try:
+            # Replace problematic characters manually
+            manual_content = content
+            
+            # Find JSON object boundaries first
+            brace_start = manual_content.find('{')
+            brace_end = manual_content.rfind('}')
+            if brace_start != -1 and brace_end != -1:
+                manual_content = manual_content[brace_start:brace_end + 1]
+            
+            # Fix common structural issues
+            # Remove any trailing commas before closing braces/brackets
+            manual_content = re.sub(r',(\s*[}\]])', r'\1', manual_content)
+            
+            # Fix unescaped quotes in string values
+            # This is a more aggressive approach to fix quotes
+            lines = manual_content.split('\n')
+            fixed_lines = []
+            
+            for line in lines:
+                # Look for lines with unescaped quotes in string values
+                if '":' in line and '"' in line.split('":')[1]:
+                    # This line has a string value with potential unescaped quotes
+                    parts = line.split('":', 1)
+                    key_part = parts[0]
+                    value_part = parts[1]
+                    
+                    # If the value part starts with a quote, we need to handle it carefully
+                    if value_part.strip().startswith('"'):
+                        # Find the end of the string value
+                        value_start = value_part.find('"')
+                        value_end = value_part.rfind('"')
+                        
+                        if value_start != -1 and value_end != -1 and value_end > value_start:
+                            # Extract the string value
+                            string_value = value_part[value_start + 1:value_end]
+                            # Escape quotes and control characters
+                            escaped_value = string_value.replace('\\', '\\\\')
+                            escaped_value = escaped_value.replace('"', '\\"')
+                            escaped_value = escaped_value.replace('\n', '\\n')
+                            escaped_value = escaped_value.replace('\r', '\\r')
+                            escaped_value = escaped_value.replace('\t', '\\t')
+                            
+                            # Reconstruct the line
+                            fixed_line = f'{key_part}": "{escaped_value}"'
+                            if value_end < len(value_part) - 1:
+                                fixed_line += value_part[value_end + 1:]
+                        else:
+                            fixed_line = line
+                    else:
+                        fixed_line = line
+                
+                fixed_lines.append(fixed_line)
+            
+            manual_content = '\n'.join(fixed_lines)
+            
+            return json.loads(manual_content)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Manual character replacement failed: {str(e)}")
+        
+        # Strategy 5: Last resort - try to extract and fix specific issues
+        try:
+            # Log the problematic content for debugging
+            logging.error(f"All JSON parsing strategies failed. Content preview: {content[:200]}...")
+            logging.error(f"Full content length: {len(content)} characters")
+            
+            # Try to identify the specific issue and fix it
+            fixed_content = content
+            
+            # Remove any null bytes or other problematic characters
+            fixed_content = fixed_content.replace('\x00', '')
+            fixed_content = fixed_content.replace('\ufffd', '')
+            
+            # Try to fix common JSON issues
+            fixed_content = re.sub(r'([^\\])"([^"]*?)([^\\])"', r'\1"\\2\\3"', fixed_content)
+            
+            return json.loads(fixed_content)
+        except json.JSONDecodeError as e:
+            logging.error(f"Final JSON parsing attempt failed: {str(e)}")
+            raise Exception(f"A4F API returned invalid JSON format that could not be parsed. This may be due to service overload. Please try again. Error: {str(e)}")
+
+    def _make_api_request_with_retry(self, system_prompt, user_prompt, max_retries=3):
+        """Make API request with automatic retry on JSON parsing failures"""
+        for attempt in range(max_retries):
+            try:
+                response = self._make_api_request(system_prompt, user_prompt)
+                return response
+            except Exception as e:
+                error_str = str(e).lower()
+                if "invalid json" in error_str or "json format" in error_str:
+                    if attempt < max_retries - 1:
+                        logging.warning(f"JSON parsing failed on attempt {attempt + 1}, retrying...")
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    else:
+                        logging.error(f"All {max_retries} attempts failed due to JSON parsing errors")
+                        raise
+                else:
+                    # Non-JSON errors should not be retried
+                    raise
+        
+        # This should never be reached, but just in case
+        raise Exception("Maximum retry attempts exceeded")
+
+    def start_course_generation(self, topic, proficiency, learning_style, generation_id, user_id):
         """Start course generation in background thread"""
-        self.generation_status[generation_id] = {
-            'status': 'starting',
-            'progress': 0,
-            'message': 'Initializing course generation...'
-        }
+        # Create a new generation record in the database
+        generation = CourseGeneration(
+            id=generation_id,
+            status='starting',
+            progress=0,
+            message='Initializing course generation...',
+            user_id=user_id
+        )
+        db.session.add(generation)
+        db.session.commit()
 
         thread = threading.Thread(
             target=self._generate_course_background,
-            args=(topic, proficiency, learning_style, generation_id)
+            args=(topic, proficiency, learning_style, generation_id, user_id)
         )
         thread.daemon = True
         thread.start()
 
         return generation_id
 
-    def _generate_course_background(self, topic, proficiency, learning_style, generation_id):
+    def _generate_course_background(self, topic, proficiency, learning_style, generation_id, user_id):
         """Background thread for course generation"""
-        try:
-            self.generation_status[generation_id] = {
-                'status': 'generating',
-                'progress': 25,
-                'message': 'Connecting to AI service...'
-            }
+        # Create application context for the background thread
+        with self.app.app_context():
+            try:
+                # Update status in database
+                generation = CourseGeneration.query.get(generation_id)
+                if generation:
+                    generation.status = 'generating'
+                    generation.progress = 25
+                    generation.message = 'Connecting to AI service...'
+                    db.session.commit()
 
-            # Generate course in background
-            course_data = self._perform_course_generation(topic, proficiency, learning_style, generation_id)
+                # Generate course in background
+                course_data = self._perform_course_generation(topic, proficiency, learning_style, generation_id)
 
-            self.generation_status[generation_id] = {
-                'status': 'completed',
-                'progress': 100,
-                'message': 'Course generation completed!'
-            }
+                # Update status and store result in database
+                generation = CourseGeneration.query.get(generation_id)
+                if generation:
+                    generation.status = 'completed'
+                    generation.progress = 100
+                    generation.message = 'Course generation completed!'
+                    generation.result = course_data
+                    db.session.commit()
 
-            self.generation_results[generation_id] = course_data
-
-        except Exception as e:
-            logging.error(f"Background generation error: {str(e)}")
-            self.generation_status[generation_id] = {
-                'status': 'error',
-                'progress': 0,
-                'message': f'Generation failed: {str(e)}'
-            }
+            except Exception as e:
+                logging.error(f"Background generation error: {str(e)}")
+                # Update error status in database
+                generation = CourseGeneration.query.get(generation_id)
+                if generation:
+                    generation.status = 'error'
+                    generation.progress = 0
+                    generation.message = f'Generation failed: {str(e)}'
+                    db.session.commit()
 
     def _perform_course_generation(self, topic, proficiency, learning_style, generation_id):
-        """Actual course generation with progress updates - using smaller requests"""
+        """Actual course generation with progress updates"""
         if not self.client:
             raise Exception("AI client not available. Please check your A4F API key configuration.")
 
         try:
+            # Update progress in database for each step
+            generation = CourseGeneration.query.get(generation_id)
+            
             # Step 1: Generate course outline and structure
-            self.generation_status[generation_id]['message'] = 'Creating course outline...'
-            self.generation_status[generation_id]['progress'] = 20
+            if generation:
+                generation.message = 'Creating course outline...'
+                generation.progress = 20
+                db.session.commit()
 
             outline_data = self._generate_course_outline(topic, proficiency, learning_style, generation_id)
 
             # Step 2: Generate lessons in batches
-            self.generation_status[generation_id]['message'] = 'Generating lessons...'
-            self.generation_status[generation_id]['progress'] = 40
+            if generation:
+                generation.message = 'Generating lessons...'
+                generation.progress = 40
+                db.session.commit()
 
             lessons = self._generate_lessons_batch(outline_data, topic, proficiency, learning_style, generation_id)
 
             # Step 3: Generate quizzes
-            self.generation_status[generation_id]['message'] = 'Creating quizzes...'
-            self.generation_status[generation_id]['progress'] = 70
+            if generation:
+                generation.message = 'Creating quizzes...'
+                generation.progress = 70
+                db.session.commit()
 
             quizzes = self._generate_quizzes(outline_data, topic, proficiency, generation_id)
 
             # Step 4: Generate final exam and assignment
-            self.generation_status[generation_id]['message'] = 'Creating final exam...'
-            self.generation_status[generation_id]['progress'] = 85
+            if generation:
+                generation.message = 'Creating final exam...'
+                generation.progress = 85
+                db.session.commit()
 
             final_exam, assignment = self._generate_final_components(outline_data, topic, proficiency, generation_id)
 
@@ -129,8 +370,10 @@ class AIService:
                 "final_exam": final_exam
             }
 
-            self.generation_status[generation_id]['message'] = 'Finalizing course...'
-            self.generation_status[generation_id]['progress'] = 95
+            if generation:
+                generation.message = 'Finalizing course...'
+                generation.progress = 95
+                db.session.commit()
 
             return course_data
 
@@ -167,7 +410,7 @@ class AIService:
         - Topics should progress logically from basic to advanced concepts
         - Cover the subject thoroughly with good depth and breadth"""
 
-        response = self._make_api_request(system_prompt, user_prompt)
+        response = self._make_api_request_with_retry(system_prompt, user_prompt)
         return self._parse_json_response(response)
 
     def _generate_lessons_batch(self, outline_data, topic, proficiency, learning_style, generation_id):
@@ -180,10 +423,6 @@ class AIService:
             batch_topics = topics[i:i+2]
             batch_lessons = self._generate_lesson_batch(batch_topics, topic, proficiency, learning_style)
             lessons.extend(batch_lessons)
-
-            # Update progress
-            progress = 40 + (i / len(topics)) * 25
-            self.generation_status[generation_id]['progress'] = int(progress)
 
         return lessons
 
@@ -213,7 +452,7 @@ class AIService:
         - No need to generate video URLs - these will be added automatically
         - 2-3 non-video resources per lesson from reputable sources"""
 
-        response = self._make_api_request(system_prompt, user_prompt)
+        response = self._make_api_request_with_retry(system_prompt, user_prompt)
         data = self._parse_json_response(response)
 
         # Process each lesson
@@ -266,148 +505,297 @@ class AIService:
         return valid_resources
 
     def _generate_quizzes(self, outline_data, topic, proficiency, generation_id):
-        """Generate quizzes for each lesson"""
+        """Generate quizzes for each lesson with robust JSON handling"""
         import random
         try:
-            # Randomize question counts for each quiz (1-3 questions each)
-            quiz_counts = [random.randint(1, 3) for _ in range(min(6, len(outline_data.get('outline', []))))]
-            quiz_structure = ", ".join([f"Quiz {i+1}: {count} question{'s' if count > 1 else ''}" for i, count in enumerate(quiz_counts)])
-
-            prompt = f"""Create quizzes for {topic} course topics with this specific structure: {quiz_structure}
-        - EXACTLY follow the question count specified for each quiz
-        - Mix of multiple_choice, fill_blank, short_answer, and code_writing questions (for relevant courses)
-        - Each quiz should test knowledge from the SPECIFIC lesson it follows (not cumulative)
-        - Questions should focus on the concepts taught in that particular lesson
-        - Clear explanations for each answer
-        - Focus on practical application and understanding rather than memorization
-        - IMPORTANT: Every question must have a correct_answer field that matches the question type"""
-
-            system_prompt = """Create quizzes in JSON format:
-        {
-            "quizzes": [
-                {
-                    "title": "Quiz Title",
-                    "lesson_dependency": 1,
-                    "questions": [
-                        {
-                            "question": "Question text?",
-                            "type": "multiple_choice",
-                            "options": ["Option A", "Option B", "Option C", "Option D"],
-                            "correct_answer": "Option A",
-                            "explanation": "Explanation"
-                        },
-                        {
-                            "question": "Fill in the blank: _____ is important.",
-                            "type": "fill_blank",
-                            "correct_answer": "answer",
-                            "explanation": "Explanation"
-                        },
-                        {
-                            "question": "Explain briefly.",
-                            "type": "short_answer",
-                            "correct_answer": "Sample answer",
-                            "explanation": "What makes a good answer"
-                        },
-                         {
-                            "question": "Write a Python code snippet to...",
-                            "type": "code_writing",
-                            "correct_answer": "Sample code",
-                            "explanation": "Explanation of the code"
-                        }
-                    ]
-                }
-            ]
-        }"""
-
-            response = self._make_api_request(system_prompt, prompt)
-            data = self._parse_json_response(response)
-
-            # Randomly distribute quizzes throughout the course
-            quizzes = data.get("quizzes", [])
-            num_lessons = len(outline_data["outline"])
-
-            if num_lessons > 0 and quizzes:
-                # Create a list of possible lesson dependencies (starting from lesson 3 so quizzes test previous content)
-                # Each quiz must have at least 2 lessons to test, so min dependency is 3
+            # Generate quizzes one by one to avoid complex JSON parsing issues
+            quizzes = []
+            num_lessons = len(outline_data.get('outline', []))
+            
+            # Generate 3-5 quizzes throughout the course
+            num_quizzes = min(5, max(3, num_lessons // 3))
+            
+            for quiz_num in range(num_quizzes):
+                try:
+                    # Generate quiz with 2-3 questions each
+                    question_count = random.randint(2, 3)
+                    quiz = self._generate_single_quiz(topic, proficiency, quiz_num + 1, question_count, outline_data)
+                    if quiz:
+                        quizzes.append(quiz)
+                except Exception as e:
+                    logging.warning(f"Failed to generate quiz {quiz_num + 1}: {str(e)}")
+                    continue
+            
+            # Distribute quizzes throughout the course
+            if quizzes and num_lessons > 0:
                 available_positions = list(range(3, num_lessons + 1))
-
-                # Randomly select positions for quizzes, ensuring they're spaced reasonably
-                # Sort to maintain logical order (earlier quizzes test fewer lessons)
                 random.shuffle(available_positions)
                 quiz_positions = sorted(available_positions[:len(quizzes)])
-
-                # If we have more quizzes than good positions, fill remaining with later positions
-                while len(quiz_positions) < len(quizzes):
-                    quiz_positions.append(num_lessons)
-            else:
-                quiz_positions = []
-
-            # Attach random lesson dependency to each quiz
-            for i, quiz in enumerate(quizzes):
-                if quiz_positions and i < len(quiz_positions):
-                    quiz["lesson_dependency"] = quiz_positions[i]
-                else:
-                    quiz["lesson_dependency"] = max(3, num_lessons)  # Default to testing multiple lessons
+                
+                for i, quiz in enumerate(quizzes):
+                    if i < len(quiz_positions):
+                        quiz["lesson_dependency"] = quiz_positions[i]
+                    else:
+                        quiz["lesson_dependency"] = max(3, num_lessons)
+            
+            logging.info(f"Successfully generated {len(quizzes)} quizzes")
             return quizzes
 
         except Exception as e:
             logging.error(f"Quiz generation failed: {e}")
             return []
 
+    def _generate_single_quiz(self, topic, proficiency, quiz_num, question_count, outline_data):
+        """Generate a single quiz with individual question generation"""
+        try:
+            # Generate questions one by one to avoid JSON parsing issues
+            questions = []
+            
+            for question_num in range(question_count):
+                try:
+                    question = self._generate_single_question(topic, proficiency, question_num + 1)
+                    if question:
+                        questions.append(question)
+                except Exception as e:
+                    logging.warning(f"Failed to generate question {question_num + 1} for quiz {quiz_num}: {str(e)}")
+                    continue
+            
+            if not questions:
+                logging.warning(f"No questions generated for quiz {quiz_num}")
+                return None
+            
+            # Create quiz structure
+            quiz = {
+                "title": f"Quiz {quiz_num}",
+                "lesson_dependency": 3,  # Will be updated by parent method
+                "questions": questions
+            }
+            
+            return quiz
+            
+        except Exception as e:
+            logging.error(f"Single quiz generation failed: {e}")
+            return None
+
+    def _generate_single_question(self, topic, proficiency, question_num):
+        """Generate a single quiz question with robust JSON handling"""
+        try:
+            # Question types to cycle through
+            question_types = ['multiple_choice', 'fill_blank', 'short_answer']
+            question_type = question_types[(question_num - 1) % len(question_types)]
+            
+            system_prompt = f"""Generate a single {question_type} question for a {topic} course at {proficiency} level.
+
+IMPORTANT: Return ONLY the JSON object for this single question. No additional text or markdown formatting.
+
+Question requirements:
+- Clear and concise
+- Appropriate difficulty for {proficiency} level
+- Practical application of {topic} concepts
+- Include a brief explanation
+
+Return in this exact JSON format:"""
+
+            if question_type == 'multiple_choice':
+                system_prompt += """
+{
+    "question": "What is the primary purpose of...?",
+    "type": "multiple_choice",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A",
+    "explanation": "Brief explanation of why this is correct"
+}"""
+            elif question_type == 'fill_blank':
+                system_prompt += """
+{
+    "question": "Fill in the blank: _____ is essential for...",
+    "type": "fill_blank",
+    "correct_answer": "answer",
+    "explanation": "Brief explanation of the concept"
+}"""
+            else:  # short_answer
+                system_prompt += """
+{
+    "question": "Explain briefly how...",
+    "type": "short_answer",
+    "correct_answer": "Sample answer demonstrating understanding",
+    "explanation": "What makes this a good answer"
+}"""
+
+            user_prompt = f"""Create question {question_num} for {topic} course ({proficiency} level).
+Focus on practical understanding and real-world application."""
+
+            response = self._make_api_request_with_retry(system_prompt, user_prompt)
+            
+            # Use robust parsing specifically for single questions
+            content = response.choices[0].message.content.strip()
+            question_data = self._robust_json_parse(content)
+            
+            # Validate question structure
+            required_fields = ['question', 'type', 'correct_answer', 'explanation']
+            if all(field in question_data for field in required_fields):
+                return question_data
+            else:
+                logging.warning(f"Generated question missing required fields: {list(question_data.keys())}")
+                return None
+                
+        except Exception as e:
+            logging.warning(f"Single question generation failed: {str(e)}")
+            return None
+
     def _generate_final_components(self, outline_data, topic, proficiency, generation_id):
-        """Generate final exam and assignment"""
+        """Generate final exam and assignment with robust JSON handling"""
         import random
         try:
-            # Randomize final exam question count between 25-30
-            exam_question_count = random.randint(25, 30)
-
-            prompt = f"""Create final exam and assignment for {topic} course.
-        - Final exam: EXACTLY {exam_question_count} questions (mixed types, including code analysis)
-        - Assignment: practical, hands-on project
-        - Test comprehensive understanding of all 15 lesson topics
-        - Include questions that span the entire course breadth
-        - Ensure the final exam has exactly {exam_question_count} questions - no more, no less"""
-
-            system_prompt = """Create final exam and assignment in JSON format:
-        {
-            "final_exam": {
-                "title": "Final Exam",
-                "questions": [
-                    {
-                        "question": "Question text?",
-                        "type": "multiple_choice",
-                        "options": ["Option A", "Option B", "Option C", "Option D"],
-                        "correct_answer": "Option A",
-                        "explanation": "Explanation"
-                    },
-                    {
-                        "question": "What does this code do?",
-                        "type": "code_analysis",
-                        "code": "print('Hello')",
-                        "options": ["Option A", "Option B", "Option C", "Option D"],
-                        "correct_answer": "Option A",
-                        "explanation": "Explanation"
-                    }
-                ]
-            },
-            "assignment": {
-                "title": "Assignment Title",
-                "description": "Assignment description",
-                "instructions": "Step-by-step instructions",
-                "type": "practical",
-                "difficulty": "beginner",
-                "estimated_hours": 2,
-                "resources": []
-            }
-        }"""
-
-            response = self._make_api_request(system_prompt, prompt)
-            data = self._parse_json_response(response)
-            return data.get("final_exam"), data.get("assignment")
+            # Generate final exam with individual question generation
+            exam_question_count = random.randint(15, 20)  # Reduced for reliability
+            final_exam = self._generate_final_exam(topic, proficiency, exam_question_count, outline_data)
+            
+            # Generate assignment
+            assignment = self._generate_assignment(topic, proficiency)
+            
+            return final_exam, assignment
 
         except Exception as e:
             logging.error(f"Final component generation failed: {e}")
             return None, None
+
+    def _generate_final_exam(self, topic, proficiency, question_count, outline_data):
+        """Generate final exam with individual question generation"""
+        try:
+            questions = []
+            
+            for question_num in range(question_count):
+                try:
+                    question = self._generate_final_exam_question(topic, proficiency, question_num + 1, outline_data)
+                    if question:
+                        questions.append(question)
+                except Exception as e:
+                    logging.warning(f"Failed to generate final exam question {question_num + 1}: {str(e)}")
+                    continue
+            
+            if not questions:
+                logging.warning("No questions generated for final exam")
+                return None
+            
+            final_exam = {
+                "title": "Final Exam",
+                "questions": questions
+            }
+            
+            logging.info(f"Successfully generated final exam with {len(questions)} questions")
+            return final_exam
+            
+        except Exception as e:
+            logging.error(f"Final exam generation failed: {e}")
+            return None
+
+    def _generate_final_exam_question(self, topic, proficiency, question_num, outline_data):
+        """Generate a single final exam question with robust JSON handling"""
+        try:
+            # Question types for final exam
+            question_types = ['multiple_choice', 'short_answer', 'code_analysis']
+            question_type = question_types[(question_num - 1) % len(question_types)]
+            
+            system_prompt = f"""Generate a single {question_type} question for a {topic} course final exam at {proficiency} level.
+
+IMPORTANT: Return ONLY the JSON object for this single question. No additional text or markdown formatting.
+
+Question requirements:
+- Comprehensive understanding of {topic} concepts
+- Appropriate difficulty for {proficiency} level final exam
+- Test practical application and theoretical knowledge
+- Include a brief explanation
+
+Return in this exact JSON format:"""
+
+            if question_type == 'multiple_choice':
+                system_prompt += """
+{
+    "question": "Which of the following best describes...?",
+    "type": "multiple_choice",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A",
+    "explanation": "Brief explanation of why this is correct"
+}"""
+            elif question_type == 'code_analysis':
+                system_prompt += """
+{
+    "question": "What does this code accomplish?",
+    "type": "code_analysis",
+    "code": "def example():\n    return 'result'",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A",
+    "explanation": "Brief explanation of the code's purpose"
+}"""
+            else:  # short_answer
+                system_prompt += """
+{
+    "question": "Explain the key differences between...",
+    "type": "short_answer",
+    "correct_answer": "Comprehensive answer demonstrating deep understanding",
+    "explanation": "What makes this a complete and accurate answer"
+}"""
+
+            user_prompt = f"""Create final exam question {question_num} for {topic} course ({proficiency} level).
+This should test comprehensive understanding of the entire course material."""
+
+            response = self._make_api_request_with_retry(system_prompt, user_prompt)
+            
+            # Use robust parsing specifically for single questions
+            content = response.choices[0].message.content.strip()
+            question_data = self._robust_json_parse(content)
+            
+            # Validate question structure
+            required_fields = ['question', 'type', 'correct_answer', 'explanation']
+            if all(field in question_data for field in required_fields):
+                return question_data
+            else:
+                logging.warning(f"Generated final exam question missing required fields: {list(question_data.keys())}")
+                return None
+                
+        except Exception as e:
+            logging.warning(f"Final exam question generation failed: {str(e)}")
+            return None
+
+    def _generate_assignment(self, topic, proficiency):
+        """Generate a practical assignment"""
+        try:
+            system_prompt = f"""Generate a practical assignment for a {topic} course at {proficiency} level.
+
+IMPORTANT: Return ONLY the JSON object for the assignment. No additional text or markdown formatting.
+
+Return in this exact JSON format:
+{{
+    "title": "Assignment Title",
+    "description": "Brief description of the assignment",
+    "instructions": "Step-by-step instructions for completing the assignment",
+    "type": "practical",
+    "difficulty": "{proficiency}",
+    "estimated_hours": 2,
+    "resources": []
+}}"""
+
+            user_prompt = f"""Create a practical assignment for {topic} course ({proficiency} level).
+Focus on hands-on application of concepts learned in the course."""
+
+            response = self._make_api_request_with_retry(system_prompt, user_prompt)
+            
+            # Use robust parsing
+            content = response.choices[0].message.content.strip()
+            assignment_data = self._robust_json_parse(content)
+            
+            # Validate assignment structure
+            required_fields = ['title', 'description', 'instructions', 'type', 'difficulty']
+            if all(field in assignment_data for field in required_fields):
+                return assignment_data
+            else:
+                logging.warning(f"Generated assignment missing required fields: {list(assignment_data.keys())}")
+                return None
+                
+        except Exception as e:
+            logging.warning(f"Assignment generation failed: {str(e)}")
+            return None
 
     def _make_api_request(self, system_prompt, user_prompt):
         """Make API request with retry logic and exponential backoff"""
@@ -460,7 +848,7 @@ class AIService:
         raise Exception("A4F API service failed after multiple retries with exponential backoff.")
 
     def _parse_json_response(self, response):
-        """Parse JSON response from API"""
+        """Parse JSON response from API using robust parsing"""
         if not response or not response.choices or len(response.choices) == 0:
             raise Exception("Invalid response structure from A4F API")
 
@@ -477,43 +865,32 @@ class AIService:
             logging.error(f"HTML response received: {content_str[:300]}...")
             raise Exception("A4F API service is temporarily returning error pages. This usually indicates high demand. Please wait a few minutes and try again.")
 
-        # Extract JSON from markdown code blocks
-        if '```json' in content_str:
-            json_start = content_str.find('```json') + 7
-            json_end = content_str.find('```', json_start)
-            if json_end == -1:
-                json_end = len(content_str)
-            json_content = content_str[json_start:json_end].strip()
-        elif '```' in content_str:
-            json_start = content_str.find('```') + 3
-            json_end = content_str.find('```', json_start)
-            if json_end == -1:
-                json_end = len(content_str)
-            json_content = content_str[json_start:json_end].strip()
-        else:
-            json_content = content_str
-
-        if not json_content or len(json_content) < 10:
-            raise Exception("Response content too short to be valid course data")
-
+        # Use the robust JSON parsing system
         try:
-            return json.loads(json_content)
-        except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse JSON. Content preview: {json_content[:200]}...")
+            return self._robust_json_parse(content_str)
+        except Exception as e:
+            logging.error(f"Robust JSON parsing failed: {str(e)}")
+            logging.error(f"Content preview: {content_str[:200]}...")
             logging.error(f"Full content: {content_str}")
-            raise Exception("A4F API returned invalid JSON format. This may be due to service overload. Please try again.")
+            raise Exception(f"A4F API returned invalid JSON format. This may be due to service overload. Please try again.")
 
     def get_generation_status(self, generation_id):
-        """Get current status of course generation"""
-        return self.generation_status.get(generation_id, {
-            'status': 'not_found',
-            'progress': 0,
-            'message': 'Generation ID not found'
-        })
+        """Get generation status from database"""
+        generation = CourseGeneration.query.get(generation_id)
+        if generation:
+            return {
+                'status': generation.status,
+                'progress': generation.progress,
+                'message': generation.message
+            }
+        return None
 
     def get_generation_result(self, generation_id):
-        """Get completed course generation result"""
-        return self.generation_results.get(generation_id)
+        """Get generation result from database"""
+        generation = CourseGeneration.query.get(generation_id)
+        if generation and generation.status == 'completed':
+            return generation.result
+        return None
 
     def cleanup_generation(self, generation_id):
         """Clean up generation data"""
@@ -619,18 +996,20 @@ Provide scoring and feedback for each question in JSON format with a 'results' a
 
             content = response.choices[0].message.content.strip()
 
-            # Parse JSON response
-            import json
-            if '```json' in content:
-                json_start = content.find('```json') + 7
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
-            elif '```' in content:
-                json_start = content.find('```') + 3
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
+            # Use robust JSON parsing instead of manual parsing
+            try:
+                result = self._robust_json_parse(content)
+            except Exception as e:
+                logging.error(f"Failed to parse JSON in batch grading. Error: {str(e)}")
+                logging.error(f"Content preview: {content[:200]}...")
+                # Fallback to individual grading
+                return [self._fallback_grade(
+                    q_data['question_text'], 
+                    q_data['correct_answer'], 
+                    q_data['user_answer'], 
+                    q_data['question_type']
+                ) for q_data in questions_data]
 
-            result = json.loads(content)
             results = result.get('results', [])
 
             # Validate and sanitize responses
@@ -738,18 +1117,13 @@ Provide scoring and feedback for each question in JSON format with a 'results' a
 
             content = response.choices[0].message.content.strip()
 
-            # Parse JSON response
-            import json
-            if '```json' in content:
-                json_start = content.find('```json') + 7
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
-            elif '```' in content:
-                json_start = content.find('```') + 3
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
+            # Use robust JSON parsing instead of manual parsing
+            try:
+                result = self._robust_json_parse(content)
+            except Exception as e:
+                logging.warning(f"AI grading JSON parsing failed: {e}")
+                return self._fallback_grade(question_text, correct_answer, user_answer, question_type)
 
-            result = json.loads(content)
             score = max(0.0, min(1.0, float(result.get('score', 0))))
             is_correct = result.get('is_correct', False) or score >= 0.7  # Apply threshold
             feedback = result.get('feedback', 'Answer evaluated.')

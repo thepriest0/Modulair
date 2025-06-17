@@ -84,12 +84,19 @@ function startGeneration() {
     let progressBar = document.getElementById('progress-bar');
     let statusText = document.querySelector('.text-center p');
 
-    // Start course generation
-    fetch('/start-course-generation')
+    // Get parameters from the template
+    const topic = '{{ params.topic }}';
+    const proficiency = '{{ params.proficiency }}';
+    const learning_style = '{{ params.learning_style }}';
+
+    // Start course generation with parameters
+    fetch(`/start-course-generation?topic=${encodeURIComponent(topic)}&proficiency=${encodeURIComponent(proficiency)}&learning_style=${encodeURIComponent(learning_style)}`)
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            if (data.status === 'success') {
                 statusText.textContent = 'Generation started...';
+                // Store generation_id for status checking
+                window.generationId = data.generation_id;
                 // Start polling for status
                 pollGenerationStatus();
             } else {
@@ -118,7 +125,14 @@ function startGeneration() {
             return;
         }
         
-        fetch('/check-generation-status')
+        // Use the stored generation_id for status checking
+        const generationId = window.generationId;
+        if (!generationId) {
+            showErrorWithRecovery('Generation ID not found. Please try starting the generation again.');
+            return;
+        }
+        
+        fetch(`/check-generation-status?generation_id=${generationId}&topic=${encodeURIComponent(topic)}&proficiency=${encodeURIComponent(proficiency)}&learning_style=${encodeURIComponent(learning_style)}`)
             .then(response => response.json())
             .then(data => {
                 progressBar.style.width = data.progress + '%';
@@ -128,7 +142,12 @@ function startGeneration() {
                 if (data.status === 'completed') {
                     statusText.textContent = 'Course generated successfully!';
                     setTimeout(() => {
-                        window.location.href = data.redirect_url;
+                        // Redirect to the new course
+                        if (data.course_id) {
+                            window.location.href = `/course/${data.course_id}`;
+                        } else {
+                            window.location.href = '/my-courses';
+                        }
                     }, 1000);
                 } else if (data.status === 'error') {
                     statusText.textContent = `Error: ${data.message}`;

@@ -4,7 +4,6 @@ import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from ai_service import AIService
 from flask_migrate import Migrate
@@ -12,27 +11,13 @@ import json
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql.base import PGDialect
+from db import db, Base
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
-
-# Monkey patch the _get_server_version_info method for CockroachDB compatibility
-def _get_server_version_info(self, connection):
-    version = connection.scalar(text("SELECT version()"))
-    if 'CockroachDB' in version:
-        # Return a compatible PostgreSQL version
-        return (9, 5, 0)
-    return super(PGDialect, self)._get_server_version_info(connection)
-
-PGDialect._get_server_version_info = _get_server_version_info
-
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 
 # Create the app
 app = Flask(__name__)
@@ -66,8 +51,11 @@ login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
 
-# Initialize AI service
+# Initialize AI service (without app)
 ai_service = AIService()
+
+# After app is created and configured, set the app instance
+ai_service.app = app
 
 # Add custom Jinja2 filters
 @app.template_filter('from_json')
@@ -456,99 +444,132 @@ def course_generation_progress():
 @app.route('/start-course-generation')
 @login_required
 def start_course_generation():
-    """Start asynchronous course generation"""
-    course_params = session.get('course_params')
-    if not course_params:
-        return jsonify({'error': 'No course parameters found'}), 400
-
+    """Start course generation process"""
     try:
-        # Check A4F service health first
-        if not ai_service.check_a4f_service_health():
-            return jsonify({
-                'error': 'A4F API service is currently unavailable. This is usually temporary due to high demand. Please wait 5-10 minutes and try again.'
-            }), 503
+        topic = request.args.get('topic')
+        proficiency = request.args.get('proficiency')
+        learning_style = request.args.get('learning_style')
 
-        # Generate unique ID for this generation
-        import uuid
-        generation_id = str(uuid.uuid4())
+        if not topic or not proficiency or not learning_style:
+            return jsonify({'error': 'Missing required parameters'}), 400
 
-        # Start background generation
+        # Generate a unique ID for this generation
+        generation_id = f"{current_user.id}-{int(datetime.utcnow().timestamp())}"
+
+        # Start the generation process
         ai_service.start_course_generation(
-            course_params['topic'], 
-            course_params['proficiency'], 
-            course_params['learning_style'],
-            generation_id
+            topic=topic,
+            proficiency=proficiency,
+            learning_style=learning_style,
+            generation_id=generation_id,
+            user_id=current_user.id
         )
 
-        # Store generation ID in session
-        session['generation_id'] = generation_id
-
         return jsonify({
-            'success': True, 
+            'status': 'success',
             'generation_id': generation_id,
-            'status_url': url_for('check_generation_status')
+            'message': 'Course generation started'
         })
 
     except Exception as e:
         logging.error(f"Error starting course generation: {str(e)}")
-        return jsonify({'error': f'Failed to start course generation: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/check-generation-status')
 @login_required
 def check_generation_status():
-    """Check status of course generation"""
-    generation_id = session.get('generation_id')
-    if not generation_id:
-        return jsonify({'error': 'No generation in progress'}), 400
+    """Check the status of course generation"""
+    try:
+        generation_id = request.args.get('generation_id')
+        if not generation_id:
+            return jsonify({'error': 'Missing generation_id parameter'}), 400
 
-    status = ai_service.get_generation_status(generation_id)
+        # Get status from database
+        status = ai_service.get_generation_status(generation_id)
+        if not status:
+            return jsonify({'error': 'Generation not found'}), 404
 
-    if status['status'] == 'completed':
-        # Generation is complete, prepare for preview
-        course_data = ai_service.get_generation_result(generation_id)
-        course_params = session.get('course_params')
+        # If generation is complete, get the result
+        if status['status'] == 'completed':
+            result = ai_service.get_generation_result(generation_id)
+            if result:
+                # Create the course in the database
+                try:
+                    from models import Course
+                    course = Course(
+                        title=result['title'],
+                        description=result['description'],
+                        topic=request.args.get('topic'),
+                        proficiency=request.args.get('proficiency'),
+                        learning_style=request.args.get('learning_style'),
+                        outline=json.dumps(result['outline']),
+                        user_id=current_user.id
+                    )
+                    db.session.add(course)
+                    db.session.flush()  # Get the course ID without committing
 
-        if course_data and course_params:
-            try:
-                # Store minimal data in session for preview
-                session['course_preview'] = {
-                    'topic': course_params['topic'],
-                    'proficiency': course_params['proficiency'],
-                    'learning_style': course_params['learning_style'],
-                    'title': course_data.get('title', f"{course_params['topic']} Course"),
-                    'description': course_data.get('description', ''),
-                    'outline': course_data.get('outline', []),
-                    'lesson_count': len(course_data.get('lessons', [])),
-                    'quiz_count': len(course_data.get('quizzes', []))
-                }
+                    # Create lessons
+                    from models import Lesson
+                    for idx, lesson_data in enumerate(result['lessons'], 1):
+                        lesson = Lesson(
+                            course_id=course.id,
+                            title=lesson_data['title'],
+                            content=lesson_data['content'],
+                            order_index=idx
+                        )
+                        db.session.add(lesson)
 
-                # Store full course data temporarily in a file
-                import tempfile
-                temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-                json.dump(course_data, temp_file)
-                temp_file.close()
-                session['course_data_file'] = temp_file.name
+                    # Create quizzes
+                    from models import Quiz
+                    for idx, quiz_data in enumerate(result['quizzes'], 1):
+                        quiz = Quiz(
+                            course_id=course.id,
+                            title=f"Quiz {idx}",
+                            questions=json.dumps(quiz_data),
+                            lesson_dependency=idx
+                        )
+                        db.session.add(quiz)
 
-                # Clean up
-                session.pop('course_params', None)
-                session.pop('generation_id', None)
-                ai_service.cleanup_generation(generation_id)
+                    # Create final exam
+                    if result.get('final_exam'):
+                        final_exam = Quiz(
+                            course_id=course.id,
+                            title="Final Exam",
+                            questions=json.dumps(result['final_exam']),
+                        )
+                        db.session.add(final_exam)
 
-                status['redirect_url'] = url_for('preview_course')
-                
-                # Log successful completion
-                logging.info(f"Course generation completed successfully for user {current_user.id}")
-                
-            except Exception as e:
-                logging.error(f"Error preparing course preview: {str(e)}")
-                status['status'] = 'error'
-                status['message'] = 'Error preparing course preview. Please try again.'
-        else:
-            logging.error(f"Missing course data or params. course_data: {bool(course_data)}, course_params: {bool(course_params)}")
-            status['status'] = 'error'
-            status['message'] = 'Course generation completed but data is missing. Please try again.'
+                    # Create assignments
+                    from models import Assignment
+                    for assignment_data in result.get('assignments', []):
+                        assignment = Assignment(
+                            course_id=course.id,
+                            title=assignment_data.get('title', 'Course Assignment'),
+                            description=assignment_data.get('description', ''),
+                            requirements=assignment_data.get('requirements', '')
+                        )
+                        db.session.add(assignment)
 
-    return jsonify(status)
+                    db.session.commit()
+
+                    # Return success with course ID
+                    return jsonify({
+                        'status': status['status'],
+                        'progress': status['progress'],
+                        'message': status['message'],
+                        'course_id': course.id
+                    })
+                except Exception as e:
+                    logging.error(f"Error creating course in database: {str(e)}")
+                    db.session.rollback()
+                    return jsonify({'error': f"Error creating course: {str(e)}"}), 500
+
+        # Return status for ongoing generation
+        return jsonify(status)
+
+    except Exception as e:
+        logging.error(f"Error checking generation status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/recover-courses')
 @login_required

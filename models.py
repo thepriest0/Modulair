@@ -1,4 +1,4 @@
-from app import db
+from db import db
 from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -126,3 +126,16 @@ class QuizAttempt(db.Model):
     attempt_number = db.Column(db.Integer, default=1)
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class CourseGeneration(db.Model):
+    """Model to store course generation status and results"""
+    id = db.Column(db.String(50), primary_key=True)  # generation_id
+    status = db.Column(db.String(20), nullable=False, default='starting')  # starting, generating, completed, error
+    progress = db.Column(db.Integer, nullable=False, default=0)
+    message = db.Column(db.String(500))
+    result = db.Column(db.JSON)  # Store the generated course data
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    user = db.relationship('User', backref=db.backref('course_generations', lazy=True))
