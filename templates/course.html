@@ -49,7 +49,7 @@
                     {% set is_completed = loop.index0 < progress.current_lesson %}
                     {% set is_current = loop.index0 == progress.current_lesson %}
                     <div class="p-3 rounded-lg {% if is_current %}bg-blue-50 border-2 border-blue-200{% elif is_completed %}bg-green-50 border border-green-200{% else %}bg-gray-50 border border-gray-200{% endif %} {% if is_unlocked %}cursor-pointer hover:shadow-md transition-all{% else %}cursor-not-allowed{% endif %}"
-                         {% if is_unlocked %}onclick="navigateToLesson({{ course.id }}, {{ loop.index0 }})"{% endif %}>
+                         {% if is_unlocked %}onclick="window.location.href='{{ url_for('course_lesson', course_id=course.id, lesson_index=loop.index0) }}'"{% endif %}>
                         <div class="flex items-center">
                             <div class="flex-shrink-0 mr-3">
                                 {% if is_completed %}
@@ -74,6 +74,7 @@
                             </div>
                             {% endif %}
                         </div>
+
                         <!-- Quiz Status (only show if quiz dependency matches this lesson) -->
                         {% for quiz in quizzes %}
                             {% if quiz.lesson_dependency == loop.index and quiz.lesson_id == lesson.id %}
@@ -100,10 +101,25 @@
                         <h3 class="text-lg font-semibold mb-4">Quizzes & Assessments</h3>
                         <div class="space-y-3">
                             {% for quiz in quizzes %}
-                                <a href="{{ url_for('quiz', quiz_id=quiz.id) }}" class="w-full bg-yellow-100 text-yellow-800 py-2 px-4 rounded-lg font-medium text-center block hover:bg-yellow-200 transition-colors">
-                                    <i class="fas fa-question-circle mr-2"></i>
-                                    {{ quiz.title }}
-                                </a>
+                                {% if not 'Final' in quiz.title %}
+                                    {% set is_unlocked = not quiz.lesson_dependency or progress.current_lesson >= quiz.lesson_dependency %}
+                                    {% if is_unlocked %}
+                                        <a href="{{ url_for('quiz', quiz_id=quiz.id) }}" 
+                                           class="w-full bg-yellow-100 text-yellow-800 py-3 px-4 rounded-lg font-medium text-center block hover:bg-yellow-200 transition-colors">
+                                            <i class="fas fa-unlock mr-2"></i>
+                                            {{ quiz.title }}
+                                        </a>
+                                    {% else %}
+                                        <div class="w-full bg-gray-100 text-gray-400 py-3 px-4 rounded-lg font-medium text-center cursor-not-allowed relative group">
+                                            <i class="fas fa-lock mr-2"></i>
+                                            {{ quiz.title }}
+                                            <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 transform -translate-x-1/2 -bottom-12 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg whitespace-nowrap z-10">
+                                                Complete lesson {{ quiz.lesson_dependency }} to unlock
+                                                <div class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
                             {% endfor %}
                         </div>
                     {% endif %}
@@ -159,7 +175,9 @@
                         {% for video in video_resources %}
                         {% set is_youtube = 'youtube.com' in video.url or 'youtu.be' in video.url %}
                         {% if is_youtube %}
-                            {% if 'youtube.com/watch?v=' in video.url %}
+                            {% if 'youtube.com/embed/' in video.url %}
+                                {% set video_id = video.url.split('embed/')[1].split('?')[0] %}
+                            {% elif 'youtube.com/watch?v=' in video.url %}
                                 {% set video_id = video.url.split('v=')[1].split('&')[0] %}
                             {% elif 'youtu.be/' in video.url %}
                                 {% set video_id = video.url.split('youtu.be/')[1].split('?')[0] %}
@@ -169,38 +187,39 @@
                             {% if video_id %}
                             <div class="mb-6">
                                 <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
-                                <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
-                                    <iframe 
-                                        class="w-full"
-                                        style="height: 400px;"
-                                        src="https://www.youtube.com/embed/{{ video_id }}?rel=0&showinfo=0" 
-                                        title="{{ video.title }}"
-                                        frameborder="0" 
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                                        allowfullscreen>
-                                    </iframe>
+                                <div class="relative w-full rounded-lg shadow-lg overflow-hidden">
+                                    <div id="video-container-{{ loop.index }}" class="bg-black">
+                                        <iframe 
+                                            class="w-full"
+                                            style="height: 400px;"
+                                            src="https://www.youtube.com/embed/{{ video_id }}?rel=0&showinfo=0" 
+                                            title="{{ video.title }}"
+                                            frameborder="0" 
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                            allowfullscreen
+                                            onerror="handleVideoError('video-container-{{ loop.index }}', '{{ current_lesson.title }}')">
+                                        </iframe>
+                                    </div>
                                 </div>
                             </div>
                             {% else %}
                             <div class="mb-6">
                                 <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
-                                <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
-                                    <iframe 
-                                        class="w-full"
-                                        style="height: 400px;"
-                                        src="{{ video.url }}" 
-                                        title="{{ video.title }}"
-                                        frameborder="0" 
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                                        allowfullscreen>
-                                    </iframe>
+                                <div class="p-6 bg-gray-50 rounded-lg text-center">
+                                    <p class="text-gray-600 mb-4">Sorry, this video is no longer available.</p>
+                                    <a href="https://www.youtube.com/results?search_query={{ current_lesson.title|urlencode }}+tutorial" 
+                                       target="_blank"
+                                       class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                                        <i class="fab fa-youtube mr-2"></i>
+                                        Search YouTube for: {{ current_lesson.title }}
+                                    </a>
                                 </div>
                             </div>
                             {% endif %}
                         {% else %}
                         <div class="mb-6">
                             <h4 class="text-md font-medium text-gray-800 mb-3">{{ video.title }}</h4>
-                            <div class="relative w-full rounded-lg shadow-lg overflow-hidden bg-black">
+                            <div class="relative w-full rounded-lg shadow-lg overflow-hidden">
                                 <iframe 
                                     class="w-full"
                                     style="height: 400px;"
@@ -224,7 +243,9 @@
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Resources</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {% for resource in other_resources %}
-                            <a href="{{ resource.url if resource.url != '#' else 'javascript:void(0)' }}" target="_blank" class="flex items-center p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <a href="{{ resource.url if resource.url != '#' else 'javascript:void(0)' }}" 
+                               target="_blank" 
+                               class="flex items-center p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                                 <div class="flex-shrink-0 mr-3">
                                     <i class="fas fa-{% if resource.type == 'article' %}file-alt{% elif resource.type == 'documentation' %}book{% else %}link{% endif %} text-blue-500"></i>
                                 </div>
@@ -261,20 +282,45 @@
 
                     <div>
                         {% if progress.current_lesson < lessons|length - 1 %}
-                        <a href="{{ url_for('next_lesson', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-green-600 transition-all">
-                            Next Lesson
-                            <i class="fas fa-arrow-right ml-2"></i>
-                        </a>
+                            {% set has_pending_quiz = false %}
+                            {% set first_pending_quiz = none %}
+                            {% for quiz in quizzes %}
+                                {% if quiz.lesson_dependency == progress.current_lesson + 1 %}
+                                    {% set passed_attempt = current_user.quiz_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('passed', 'equalto', true)|first %}
+                                    {% if not passed_attempt %}
+                                        {% set has_pending_quiz = true %}
+                                        {% if first_pending_quiz is none %}
+                                            {% set first_pending_quiz = quiz %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if has_pending_quiz and first_pending_quiz %}
+                                <a href="{{ url_for('quiz', quiz_id=first_pending_quiz.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-600 transition-all">
+                                    Complete Required Quiz
+                                    <i class="fas fa-question-circle ml-2"></i>
+                                </a>
+                                <p class="text-sm text-gray-600 mt-2">
+                                    <i class="fas fa-info-circle"></i>
+                                    You must complete this quiz before proceeding to the next lesson.
+                                </p>
+                            {% else %}
+                                <a href="{{ url_for('next_lesson', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-green-600 transition-all">
+                                    Next Lesson
+                                    <i class="fas fa-arrow-right ml-2"></i>
+                                </a>
+                            {% endif %}
                         {% elif progress.completion_percentage >= 100 %}
-                        <a href="{{ url_for('certificate', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-blue-600 transition-all">
-                            Get Certificate
-                            <i class="fas fa-certificate ml-2"></i>
-                        </a>
+                            <a href="{{ url_for('certificate', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-blue-600 transition-all">
+                                Get Certificate
+                                <i class="fas fa-certificate ml-2"></i>
+                            </a>
                         {% else %}
-                        <a href="{{ url_for('quiz', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-600 transition-all">
-                            Take Quiz
-                            <i class="fas fa-question-circle ml-2"></i>
-                        </a>
+                            <a href="{{ url_for('quiz', course_id=course.id) }}" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-600 transition-all">
+                                Take Quiz
+                                <i class="fas fa-question-circle ml-2"></i>
+                            </a>
                         {% endif %}
                     </div>
                 </div>
@@ -295,4 +341,72 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    function toggleLesson(index) {
+        const content = document.getElementById(`lesson${index}`);
+        const icon = document.getElementById(`lessonIcon${index}`);
+        
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+        } else {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-180');
+        }
+    }
+
+    function toggleAllLessons() {
+        const contents = document.querySelectorAll('.lesson-content');
+        const icons = document.querySelectorAll('[id^="lessonIcon"]');
+        const toggleText = document.getElementById('toggleAllText');
+        const isAnyVisible = Array.from(contents).some(content => !content.classList.contains('hidden'));
+        
+        contents.forEach(content => {
+            if (isAnyVisible) {
+                content.classList.add('hidden');
+            } else {
+                content.classList.remove('hidden');
+            }
+        });
+        
+        icons.forEach(icon => {
+            if (isAnyVisible) {
+                icon.classList.remove('rotate-180');
+            } else {
+                icon.classList.add('rotate-180');
+            }
+        });
+        
+        toggleText.textContent = isAnyVisible ? 'Expand All' : 'Collapse All';
+    }
+
+    // Auto-expand current lesson
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentLesson = {{ progress.current_lesson + 1 }};
+        if (currentLesson) {
+            toggleLesson(currentLesson);
+        }
+    });
+
+    function handleVideoError(containerId, lessonTitle) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="p-6 bg-gray-50 rounded-lg text-center">
+                    <p class="text-gray-600 mb-4">Sorry, this video is no longer available.</p>
+                    <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(lessonTitle)}+tutorial" 
+                       target="_blank"
+                       class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                        <i class="fab fa-youtube mr-2"></i>
+                        Search YouTube for: ${lessonTitle}
+                    </a>
+                </div>
+            `;
+        }
+    }
+</script>
 {% endblock %}

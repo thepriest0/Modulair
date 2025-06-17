@@ -72,7 +72,7 @@
                         {% for quiz in course.course_data.quizzes %}
                         <div class="border border-gray-200 rounded-lg p-4">
                             <h4 class="font-semibold text-gray-900 mb-2">{{ quiz.title }}</h4>
-                            <p class="text-gray-600 text-sm">{{ quiz.questions|length }} questions • Passing score: 70%</p>
+                            <p class="text-gray-600 text-sm">{{ quiz.questions|length }} questions • Passing score: {% if 'Final' in quiz.title %}80%{% else %}100%{% endif %}</p>
                         </div>
                         {% endfor %}
                     </div>

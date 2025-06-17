@@ -15,4 +15,5 @@ python-dotenv>=1.0.0
 Flask-Migrate>=4.0.5
 psycopg2-binary>=2.9.9
 sqlalchemy-cockroachdb>=2.0.3
+google-api-python-client==2.108.0
 gevent>=23.9.1 

@@ -6,12 +6,18 @@ import threading
 import time
 from openai import OpenAI
 import re
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 class AIService:
     def __init__(self):
         self.a4f_api_key = os.environ.get("A4F_API_KEY", "default-key")
         self.a4f_base_url = "https://api.a4f.co/v1"
         self.model = "provider-5/gpt-4o"
+        self.youtube_api_key = os.environ.get("YOUTUBE_API_KEY")
+        
+        # Add debug logging for YouTube API key
+        logging.info(f"YouTube API Key present: {bool(self.youtube_api_key)}")
 
         # Track generation status
         self.generation_status = {}
@@ -23,6 +29,16 @@ class AIService:
                 base_url=self.a4f_base_url,
                 timeout=120.0  # Increased to 2 minutes
             )
+            
+            # Initialize YouTube API client if key is available
+            if self.youtube_api_key:
+                logging.info("Attempting to initialize YouTube API client...")
+                self.youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
+                logging.info("YouTube API client initialized successfully")
+            else:
+                logging.warning("YouTube API key not found. Video search functionality will be limited.")
+                self.youtube = None
+                
         except Exception as e:
             logging.error(f"Failed to initialize AI client: {str(e)}")
             self.client = None
@@ -180,11 +196,9 @@ class AIService:
                     "title": "Lesson Title",
                     "content": "Detailed lesson content with HTML formatting (600+ words)",
                     "resources": [
-                        {"type": "video", "title": "Educational Video Title", "url": "https://www.youtube.com/embed/VIDEO_ID"},
                         {"type": "article", "title": "Related Article Title", "url": "https://example.com/article"},
                         {"type": "documentation", "title": "Official Documentation", "url": "https://docs.example.com"}
-                    ],
-                    "youtube_video": ""
+                    ]
                 }
             ]
         }"""
@@ -194,55 +208,62 @@ class AIService:
 
         For {proficiency} learners ({learning_style} style):
         - Each lesson 600+ words with HTML formatting
-        - Only include youtube_video if you can find a REAL, CURRENT, and HIGHLY RELEVANT video
-        - Leave youtube_video as empty string "" if no suitable video exists
-        - Prioritize video quality and relevance over quantity
-        - For Cybersecurity: Professor Messer, SimplyCyber, NetworkChuck, Cybrary
-        - 3-4 resources per lesson from reputable sources
-        - Practical examples and case studies"""
+        - Include practical examples and case studies
+        - Focus on clear explanations and real-world applications
+        - No need to generate video URLs - these will be added automatically
+        - 2-3 non-video resources per lesson from reputable sources"""
 
         response = self._make_api_request(system_prompt, user_prompt)
         data = self._parse_json_response(response)
 
-        # Validate resources (placeholder - implement actual validation later)
+        # Process each lesson
         for lesson in data.get("lessons", []):
+            # Search for a relevant YouTube video
+            search_query = f"{topic} {lesson['title']} tutorial {proficiency} level"
+            logging.info(f"Searching for video for lesson: {lesson['title']}")
+            video_id, video_title = self.search_youtube_video(search_query)
+
+            # Update resources with valid video
+            if video_id:
+                logging.info(f"Adding video {video_id} to lesson {lesson['title']}")
+                # Add as a video resource
+                if 'resources' not in lesson:
+                    lesson['resources'] = []
+                
+                lesson['resources'].append({
+                    "type": "video",
+                    "title": video_title,
+                    "url": f"https://www.youtube.com/embed/{video_id}"
+                })
+            else:
+                logging.warning(f"No suitable video found for lesson: {lesson['title']}")
+
+            # Validate other resources
             if 'resources' in lesson:
                 lesson['resources'] = self._validate_resources(lesson['resources'])
-
-            # Validate YouTube video ID and remove if invalid or empty
-            if 'youtube_video' in lesson:
-                if lesson['youtube_video'] and lesson['youtube_video'].strip():
-                    video_id = lesson['youtube_video'].split('/')[-1]
-                    if not self._is_valid_youtube_id(video_id):
-                        lesson['youtube_video'] = ""  # Remove invalid video
-                else:
-                    lesson['youtube_video'] = ""  # Ensure empty string for missing videos
 
         return data.get("lessons", [])
 
     def _validate_resources(self, resources):
-        """Placeholder for validating resource URLs - implement URL checking here."""
+        """Validate and filter resource URLs"""
         valid_resources = []
         for resource in resources:
-            # In a real implementation, you would check if the URL is reachable
-            # and if the resource is still available.
-            # For now, we just include a placeholder.
-            # Example:
-            # try:
-            #     response = requests.head(resource['url'], timeout=5)
-            #     if response.status_code < 400:
-            #         valid_resources.append(resource)
-            # except requests.RequestException:
-            #     pass # Log error
+            # Skip validation for YouTube videos as they're already validated
+            if resource['type'] == 'video' and 'youtube.com/embed/' in resource['url']:
+                valid_resources.append(resource)
+                continue
 
-            valid_resources.append(resource)
+            # Basic URL validation for other resources
+            if 'url' in resource and resource['url']:
+                try:
+                    # You might want to add more sophisticated URL validation here
+                    if resource['url'].startswith(('http://', 'https://')):
+                        valid_resources.append(resource)
+                except Exception as e:
+                    logging.warning(f"Invalid resource URL: {str(e)}")
+                    continue
+
         return valid_resources
-
-    def _is_valid_youtube_id(self, video_id):
-        """Basic check for YouTube video ID format"""
-        # This is a very basic check.  A more robust check would involve
-        # calling the YouTube API.
-        return re.match(r"^[a-zA-Z0-9_-]{11}$", video_id) is not None
 
     def _generate_quizzes(self, outline_data, topic, proficiency, generation_id):
         """Generate quizzes for each lesson"""
@@ -788,3 +809,62 @@ Provide scoring and feedback for each question in JSON format with a 'results' a
                 'feedback': 'Does not demonstrate understanding of key concepts.',
                 'confidence': 0.4
             }
+
+    def search_youtube_video(self, query, max_results=3):
+        """
+        Search for YouTube videos and return the best match
+        Returns a tuple of (video_id, title) or (None, None) if no suitable video is found
+        """
+        logging.info(f"Attempting to search YouTube for: {query}")
+        
+        if not self.youtube:
+            logging.warning("YouTube API not initialized. Cannot search for videos.")
+            return None, None
+
+        try:
+            # Search for videos
+            logging.info("Making YouTube API search request...")
+            search_response = self.youtube.search().list(
+                q=query,
+                part='id,snippet',
+                maxResults=max_results,
+                type='video',
+                videoEmbeddable='true',  # Only embeddable videos
+                safeSearch='strict',  # Safe content only
+                relevanceLanguage='en'  # English videos only
+            ).execute()
+
+            # Process each video
+            for search_result in search_response.get('items', []):
+                if search_result['id']['kind'] == 'youtube#video':
+                    video_id = search_result['id']['videoId']
+                    logging.info(f"Found potential video: {video_id}")
+                    
+                    # Get video statistics
+                    video_response = self.youtube.videos().list(
+                        part='statistics,status',
+                        id=video_id
+                    ).execute()
+
+                    if video_response['items']:
+                        video_info = video_response['items'][0]
+                        
+                        # Check if video is available and embeddable
+                        if (video_info['status']['embeddable'] and 
+                            video_info['status']['privacyStatus'] == 'public'):
+                            
+                            logging.info(f"Selected video: {video_id} - {search_result['snippet']['title']}")
+                            return (
+                                video_id,
+                                search_result['snippet']['title']
+                            )
+
+            logging.warning("No suitable videos found")
+            return None, None
+
+        except HttpError as e:
+            logging.error(f"YouTube API error: {str(e)}")
+            return None, None
+        except Exception as e:
+            logging.error(f"Error searching YouTube: {str(e)}")
+            return None, None

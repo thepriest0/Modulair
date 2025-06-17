@@ -509,33 +509,59 @@ def check_generation_status():
         course_params = session.get('course_params')
 
         if course_data and course_params:
-            # Store minimal data in session for preview
-            session['course_preview'] = {
-                'topic': course_params['topic'],
-                'proficiency': course_params['proficiency'],
-                'learning_style': course_params['learning_style'],
-                'title': course_data.get('title', f"{course_params['topic']} Course"),
-                'description': course_data.get('description', ''),
-                'outline': course_data.get('outline', []),
-                'lesson_count': len(course_data.get('lessons', [])),
-                'quiz_count': len(course_data.get('quizzes', []))
-            }
+            try:
+                # Store minimal data in session for preview
+                session['course_preview'] = {
+                    'topic': course_params['topic'],
+                    'proficiency': course_params['proficiency'],
+                    'learning_style': course_params['learning_style'],
+                    'title': course_data.get('title', f"{course_params['topic']} Course"),
+                    'description': course_data.get('description', ''),
+                    'outline': course_data.get('outline', []),
+                    'lesson_count': len(course_data.get('lessons', [])),
+                    'quiz_count': len(course_data.get('quizzes', []))
+                }
 
-            # Store full course data temporarily in a file
-            import tempfile
-            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-            json.dump(course_data, temp_file)
-            temp_file.close()
-            session['course_data_file'] = temp_file.name
+                # Store full course data temporarily in a file
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+                json.dump(course_data, temp_file)
+                temp_file.close()
+                session['course_data_file'] = temp_file.name
 
-            # Clean up
-            session.pop('course_params', None)
-            session.pop('generation_id', None)
-            ai_service.cleanup_generation(generation_id)
+                # Clean up
+                session.pop('course_params', None)
+                session.pop('generation_id', None)
+                ai_service.cleanup_generation(generation_id)
 
-            status['redirect_url'] = url_for('preview_course')
+                status['redirect_url'] = url_for('preview_course')
+                
+                # Log successful completion
+                logging.info(f"Course generation completed successfully for user {current_user.id}")
+                
+            except Exception as e:
+                logging.error(f"Error preparing course preview: {str(e)}")
+                status['status'] = 'error'
+                status['message'] = 'Error preparing course preview. Please try again.'
+        else:
+            logging.error(f"Missing course data or params. course_data: {bool(course_data)}, course_params: {bool(course_params)}")
+            status['status'] = 'error'
+            status['message'] = 'Course generation completed but data is missing. Please try again.'
 
     return jsonify(status)
+
+@app.route('/recover-courses')
+@login_required
+def recover_courses():
+    """Help users recover from session issues by showing their existing courses"""
+    courses = Course.query.filter_by(user_id=current_user.id).order_by(Course.id.desc()).all()
+    
+    if courses:
+        flash('You have existing courses. You can continue with any of them below.', 'info')
+        return redirect(url_for('my_courses'))
+    else:
+        flash('No existing courses found. Please create a new course.', 'info')
+        return redirect(url_for('create_course'))
 
 @app.route('/preview-course')
 def preview_course():
@@ -544,6 +570,16 @@ def preview_course():
     course_data_file = session.get('course_data_file')
 
     if not course_preview or not course_data_file:
+        # Add debugging information
+        logging.warning(f"Preview course accessed without session data. course_preview: {bool(course_preview)}, course_data_file: {bool(course_data_file)}")
+        
+        # Check if there are any recent courses for this user
+        if current_user.is_authenticated:
+            recent_course = Course.query.filter_by(user_id=current_user.id).order_by(Course.id.desc()).first()
+            if recent_course:
+                flash('No course preview available. You can continue with your existing courses or create a new one.', 'error')
+                return redirect(url_for('my_courses'))
+        
         flash('No course preview available. Please create a course first.', 'error')
         return redirect(url_for('create_course'))
 
@@ -570,6 +606,7 @@ def start_course():
     course_data_file = session.get('course_data_file')
 
     if not course_preview or not course_data_file:
+        logging.warning(f"Start course accessed without session data. course_preview: {bool(course_preview)}, course_data_file: {bool(course_data_file)}")
         flash('No course preview available. Please create a course first.', 'error')
         return redirect(url_for('create_course'))
 
@@ -774,17 +811,19 @@ def next_lesson(course_id):
     lessons = Lesson.query.filter_by(course_id=course_id).order_by(Lesson.order_index).all()
     current_lesson = lessons[progress.current_lesson] if progress.current_lesson < len(lessons) else None
 
-    # Check if there are any quizzes that need to be passed before proceeding
-    current_lesson_index = progress.current_lesson + 1  # Next lesson index (1-based)
-    
-    # Find any quizzes that should be completed before this lesson
-    blocking_quizzes = Quiz.query.filter(
+    if not current_lesson:
+        flash('No more lessons available.', 'info')
+        return redirect(url_for('course_detail', course_id=course_id))
+
+    # Check if there are any quizzes that require the current lesson
+    current_lesson_quizzes = Quiz.query.filter(
         Quiz.course_id == course_id,
-        Quiz.lesson_dependency < current_lesson_index,
-        Quiz.title.notlike('%Final%')  # Exclude final exam
+        Quiz.lesson_dependency == progress.current_lesson + 1,  # +1 because lesson_dependency is 1-based
+        ~Quiz.title.contains('Final')  # Exclude final exams
     ).all()
     
-    for quiz in blocking_quizzes:
+    # If there are quizzes for this lesson, redirect to the first unpassed quiz
+    for quiz in current_lesson_quizzes:
         passed_attempt = QuizAttempt.query.filter_by(
             quiz_id=quiz.id,
             user_id=current_user.id,
@@ -792,10 +831,10 @@ def next_lesson(course_id):
         ).first()
         
         if not passed_attempt:
-            flash(f'You must pass "{quiz.title}" before proceeding to the next lesson.', 'warning')
+            # Redirect to quiz instead of showing a warning
             return redirect(url_for('quiz', quiz_id=quiz.id))
 
-    # Move to next lesson
+    # Move to next lesson only if all quizzes are passed
     if progress.current_lesson < len(lessons) - 1:
         progress.current_lesson += 1
         progress.completion_percentage = int((progress.current_lesson + 1) / len(lessons) * 100)
@@ -819,16 +858,24 @@ def quiz(quiz_id):
         flash('Quiz not found.', 'error')
         return redirect(url_for('index'))
 
-    # Check if user has reached the required lesson for this quiz
+    # Prevent direct access to final exams through quiz route
+    if 'Final' in quiz_obj.title:
+        flash('Please access the final exam through the course page after completing all lessons.', 'warning')
+        return redirect(url_for('course_detail', course_id=course.id))
+
+    # Check if user has started the course
     progress = Progress.query.filter_by(user_id=current_user.id, course_id=course.id).first()
     if not progress:
         flash('You must start the course before taking quizzes.', 'error')
         return redirect(url_for('course_detail', course_id=course.id))
 
-    # Check lesson dependency - user must have completed the required lesson
-    if quiz_obj.lesson_dependency and progress.current_lesson < quiz_obj.lesson_dependency - 1:
-        flash(f'You must complete lesson {quiz_obj.lesson_dependency} before taking this quiz.', 'warning')
-        return redirect(url_for('course_detail', course_id=course.id))
+    # Check lesson dependency - user must be at or have completed the required lesson
+    if quiz_obj.lesson_dependency:
+        # Subtract 1 because lesson_dependency is 1-based but current_lesson is 0-based
+        required_lesson = quiz_obj.lesson_dependency - 1
+        if progress.current_lesson < required_lesson:
+            flash(f'You must complete lesson {quiz_obj.lesson_dependency} before taking this quiz.', 'warning')
+            return redirect(url_for('course_detail', course_id=course.id))
 
     # Check if user has already passed this quiz
     attempt = QuizAttempt.query.filter_by(
@@ -986,7 +1033,7 @@ def submit_quiz(quiz_id):
 
     # Different passing requirements for different quiz types
     if 'Final' in quiz_obj.title or 'Exam' in quiz_obj.title:
-        passing_score = 70  # 70% for final exam to get certificate
+        passing_score = 80  # 80% for final exam to get certificate
         passed = percentage >= passing_score
     else:
         # For regular quizzes: must get all questions correct
@@ -1024,7 +1071,7 @@ def submit_quiz(quiz_id):
             return redirect(url_for('next_lesson', course_id=course.id))
     else:
         if 'Final' in quiz_obj.title or 'Exam' in quiz_obj.title:
-            flash(f'You scored {percentage:.1f}%. You need 70% to pass. Please try again.', 'error')
+            flash(f'You scored {percentage:.1f}%. You need 80% to pass. Please try again.', 'error')
         else:
             flash(f'You must get all questions correct to pass. Please try again.', 'error')
         return redirect(url_for('quiz', quiz_id=quiz_id))
@@ -1241,7 +1288,7 @@ def submit_final_exam(course_id):
         })
 
     percentage = (score / total_questions) * 100
-    passing_score = 70  # 70% to pass final exam
+    passing_score = 80  # 80% to pass final exam
     passed = percentage >= passing_score
 
     # Get attempt number
@@ -1276,7 +1323,7 @@ def submit_final_exam(course_id):
         return redirect(url_for('certificate', course_id=course_id))
     else:
         db.session.commit()
-        flash(f'You scored {percentage:.1f}%. You need 70% to pass. Please study and try again.', 'error')
+        flash(f'You scored {percentage:.1f}%. You need 80% to pass. Please study and try again.', 'error')
         return redirect(url_for('final_exam', course_id=course_id))
 
 @app.route('/certificate/<int:course_id>')
@@ -1421,6 +1468,25 @@ def submit_assignment(assignment_id):
     db.session.commit()
     flash('Assignment submitted successfully!', 'success')
     return redirect(url_for('course_assignments', course_id=course.id))
+
+@app.route('/debug-session')
+@login_required
+def debug_session():
+    """Debug route to check session state (development only)"""
+    session_data = {
+        'course_params': session.get('course_params'),
+        'generation_id': session.get('generation_id'),
+        'course_preview': session.get('course_preview'),
+        'course_data_file': session.get('course_data_file'),
+        'user_id': current_user.id if current_user.is_authenticated else None
+    }
+    
+    # Also check for existing courses
+    if current_user.is_authenticated:
+        courses = Course.query.filter_by(user_id=current_user.id).all()
+        session_data['existing_courses'] = [{'id': c.id, 'title': c.title} for c in courses]
+    
+    return jsonify(session_data)
 
 @app.errorhandler(404)
 def not_found(error):
