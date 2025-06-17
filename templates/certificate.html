@@ -73,6 +73,7 @@
                         </div>
                     </div>
                     <div class="signature-area flex flex-col items-end">
+                        <span class="signature-script">ModulAIr</span>
                         <div class="signature-line"></div>
                         <span class="signature-label text-xs text-gray-500 mt-1">Authorized Signature</span>
                     </div>
@@ -150,6 +151,9 @@
         </div>
     </div>
 </div>
+
+<!-- Google Fonts for signature -->
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
 
 <style>
 @media print {
@@ -278,6 +282,16 @@
 }
 .footer-info p {
     margin-bottom: 0;
+}
+
+.signature-script {
+    font-family: 'Dancing Script', cursive, serif;
+    font-size: 1.2rem;
+    color: #111;
+    font-weight: 700;
+    margin-bottom: -0.2em;
+    letter-spacing: 1px;
+    line-height: 1;
 }
 </style>
 {% endblock %}
