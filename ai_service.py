@@ -216,27 +216,42 @@ class AIService:
         response = self._make_api_request(system_prompt, user_prompt)
         data = self._parse_json_response(response)
 
+        # Keep track of used videos to avoid duplicates
+        used_videos = set()
+
         # Process each lesson
         for lesson in data.get("lessons", []):
-            # Search for a relevant YouTube video
-            search_query = f"{topic} {lesson['title']} tutorial {proficiency} level"
+            # Search for a relevant YouTube video with more specific query
+            search_query = f"{lesson['title']} {topic} tutorial {proficiency} level"
             logging.info(f"Searching for video for lesson: {lesson['title']}")
-            video_id, video_title = self.search_youtube_video(search_query)
-
-            # Update resources with valid video
-            if video_id:
-                logging.info(f"Adding video {video_id} to lesson {lesson['title']}")
-                # Add as a video resource
-                if 'resources' not in lesson:
-                    lesson['resources'] = []
+            
+            # Try up to 3 times to find a unique video
+            max_attempts = 3
+            video_found = False
+            
+            for attempt in range(max_attempts):
+                video_id, video_title = self.search_youtube_video(search_query)
                 
-                lesson['resources'].append({
-                    "type": "video",
-                    "title": video_title,
-                    "url": f"https://www.youtube.com/embed/{video_id}"
-                })
-            else:
-                logging.warning(f"No suitable video found for lesson: {lesson['title']}")
+                if video_id and video_id not in used_videos:
+                    logging.info(f"Adding video {video_id} to lesson {lesson['title']}")
+                    # Add as a video resource
+                    if 'resources' not in lesson:
+                        lesson['resources'] = []
+                    
+                    lesson['resources'].append({
+                        "type": "video",
+                        "title": video_title,
+                        "url": f"https://www.youtube.com/embed/{video_id}"
+                    })
+                    used_videos.add(video_id)
+                    video_found = True
+                    break
+                elif attempt < max_attempts - 1:
+                    # Modify search query for next attempt
+                    search_query = f"{topic} {lesson['title']} {proficiency} programming tutorial"
+            
+            if not video_found:
+                logging.warning(f"No unique video found for lesson: {lesson['title']}")
 
             # Validate other resources
             if 'resources' in lesson:
