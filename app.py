@@ -19,13 +19,18 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Monkey patch the _get_server_version_info method for CockroachDB compatibility
+# Monkey patch the _get_server_version_info method for PostgreSQL compatibility
 def _get_server_version_info(self, connection):
-    version = connection.scalar(text("SELECT version()"))
-    if 'CockroachDB' in version:
-        # Return a compatible PostgreSQL version
-        return (9, 5, 0)
-    return super(PGDialect, self)._get_server_version_info(connection)
+    try:
+        version = connection.scalar(text("SELECT version()"))
+        if version:
+            # Extract version number from string like "PostgreSQL 15.4 on x86_64-pc-linux-gnu"
+            version_parts = version.split()[1].split('.')
+            return tuple(int(x) for x in version_parts)
+        return (9, 6, 0)  # Fallback version if we can't detect
+    except Exception as e:
+        logging.warning(f"Failed to get PostgreSQL version: {e}")
+        return (9, 6, 0)  # Fallback version
 
 PGDialect._get_server_version_info = _get_server_version_info
 
@@ -41,17 +46,31 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database
 if os.environ.get("DATABASE_URL"):
-    # Production database (PostgreSQL/CockroachDB)
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+    # Production database (Neon)
+    db_url = os.environ.get("DATABASE_URL")
+    
+    # Add SSL mode if not present
+    if "sslmode=" not in db_url:
+        db_url += "?sslmode=require"
+    
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 15,
+        "pool_timeout": 30,
+        "connect_args": {
+            "sslmode": "require"
+        }
+    }
 else:
     # Development database (SQLite)
     sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'modulair.db')
     os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-}
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True
+    }
 
 # Initialize the app with the extension
 db.init_app(app)

@@ -3,203 +3,233 @@
 {% block title %}My Courses - ModulAIr{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Courses</h1>
-            <p class="text-base sm:text-lg text-gray-600">Track your learning progress and continue your courses</p>
-        </div>
-        <a href="{{ url_for('create_course') }}" class="inline-flex items-center justify-center bg-gradient-to-r from-blue-500 to-green-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105 w-full sm:w-auto">
-            <i class="fas fa-plus mr-2"></i>
-            Create New Course
-        </a>
+<div class="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white min-h-screen">
+    <!-- Background Pattern -->
+    <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 opacity-10" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%234F46E5\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"></div>
     </div>
 
-    {% if courses_with_progress %}
-    <!-- Course Statistics -->
-    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        <div class="bg-white rounded-xl p-4 sm:p-6 shadow-md">
-            <div class="flex items-center">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
-                    <i class="fas fa-book text-blue-600 text-lg sm:text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs sm:text-sm text-gray-600">Total Courses</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ courses_with_progress|length }}</p>
-                </div>
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-12">
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2">My Learning Journey</h1>
+                <p class="text-lg text-gray-600">Track your progress and continue your tech education</p>
             </div>
+            <a href="{{ url_for('create_course') }}" class="group inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-green-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:scale-105 w-full sm:w-auto">
+                <span class="mr-2">Create New Course</span>
+                <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </a>
         </div>
-        
-        <div class="bg-white rounded-xl p-4 sm:p-6 shadow-md">
-            <div class="flex items-center">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
-                    <i class="fas fa-check-circle text-green-600 text-lg sm:text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs sm:text-sm text-gray-600">Completed</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">
-                        {{ courses_with_progress|selectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-xl p-4 sm:p-6 shadow-md">
-            <div class="flex items-center">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
-                    <i class="fas fa-clock text-yellow-600 text-lg sm:text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs sm:text-sm text-gray-600">In Progress</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">
-                        {{ courses_with_progress|rejectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-xl p-4 sm:p-6 shadow-md">
-            <div class="flex items-center">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
-                    <i class="fas fa-certificate text-purple-600 text-lg sm:text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs sm:text-sm text-gray-600">Certificates</p>
-                    <p class="text-xl sm:text-2xl font-bold text-gray-900">
-                        {{ courses_with_progress|selectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Course List -->
-    <div class="space-y-4 sm:space-y-6">
-        {% for item in courses_with_progress %}
-        {% set course = item.course %}
-        {% set progress = item.progress %}
-        
-        <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow">
-            <div class="flex flex-col space-y-4">
-                <div class="flex-1">
-                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
-                        <div class="space-y-2">
-                            <h3 class="text-lg sm:text-xl font-bold text-gray-900">{{ course.title }}</h3>
-                            <p class="text-sm sm:text-base text-gray-600">{{ course.description[:150] }}{% if course.description|length > 150 %}...{% endif %}</p>
-                            <div class="flex flex-wrap gap-3 text-xs sm:text-sm text-gray-500">
-                                <span class="flex items-center">
-                                    <i class="fas fa-tag mr-1"></i>
-                                    {{ course.topic }}
-                                </span>
-                                <span class="flex items-center">
-                                    <i class="fas fa-signal mr-1"></i>
-                                    {{ course.proficiency }}
-                                </span>
-                                <span class="flex items-center">
-                                    <i class="fas fa-calendar mr-1"></i>
-                                    {{ course.created_at.strftime('%b %d, %Y') }}
-                                </span>
-                            </div>
+        {% if courses_with_progress %}
+        <!-- Course Statistics -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-green-500 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                <div class="relative bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mr-4 transform group-hover:rotate-12 transition-transform">
+                            <i class="fas fa-book text-blue-600 text-2xl"></i>
                         </div>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {{ course.proficiency }}
-                            </span>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {{ course.learning_style }}
-                            </span>
+                        <div>
+                            <p class="text-sm text-gray-600">Total Courses</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ courses_with_progress|length }}</p>
                         </div>
                     </div>
-                    
-                    <!-- Progress Bar -->
-                    <div class="mb-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs sm:text-sm font-medium text-gray-700">Progress</span>
-                            <span class="text-xs sm:text-sm font-medium text-gray-700">{{ progress.completion_percentage if progress else 0 }}%</span>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                <div class="relative bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mr-4 transform group-hover:rotate-12 transition-transform">
+                            <i class="fas fa-check-circle text-green-600 text-2xl"></i>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300" 
-                                 style="width: {{ progress.completion_percentage if progress else 0 }}%"></div>
+                        <div>
+                            <p class="text-sm text-gray-600">Completed</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ courses_with_progress|selectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                <div class="relative bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center mr-4 transform group-hover:rotate-12 transition-transform">
+                            <i class="fas fa-clock text-yellow-600 text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">In Progress</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ courses_with_progress|rejectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                <div class="relative bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mr-4 transform group-hover:rotate-12 transition-transform">
+                            <i class="fas fa-certificate text-purple-600 text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Certificates</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ courses_with_progress|selectattr('progress.completion_percentage', 'equalto', 100)|list|length }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Course List -->
+        <div class="space-y-6">
+            {% for item in courses_with_progress %}
+            {% set course = item.course %}
+            {% set progress = item.progress %}
+            
+            <div class="group bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <div class="p-6">
+                    <div class="flex flex-col space-y-4">
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+                                <div class="space-y-3">
+                                    <div class="flex items-center">
+                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center mr-4 transform group-hover:rotate-12 transition-transform">
+                                            <i class="fas fa-graduation-cap text-white text-xl"></i>
+                                        </div>
+                                        <h3 class="text-xl font-bold text-gray-900">{{ course.title }}</h3>
+                                    </div>
+                                    <p class="text-gray-600">{{ course.description[:150] }}{% if course.description|length > 150 %}...{% endif %}</p>
+                                    <div class="flex flex-wrap gap-4">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                            <i class="fas fa-tag mr-2"></i>{{ course.topic }}
+                                        </span>
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-signal mr-2"></i>{{ course.proficiency }}
+                                        </span>
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                                            <i class="fas fa-brain mr-2"></i>{{ course.learning_style }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Progress Bar -->
+                            <div class="mb-6">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-700">Progress</span>
+                                    <span class="text-sm font-medium text-gray-700">{{ progress.completion_percentage if progress else 0 }}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500 ease-out" 
+                                         style="width: {{ progress.completion_percentage if progress else 0 }}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                {% if progress and progress.completion_percentage >= 100 %}
+                                <a href="{{ url_for('certificate', course_id=course.id) }}" 
+                                   class="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-full font-medium hover:shadow-lg transition-all">
+                                    <i class="fas fa-certificate mr-2 group-hover:rotate-12 transition-transform"></i>
+                                    View Certificate
+                                </a>
+                                {% else %}
+                                <a href="{{ url_for('course_detail', course_id=course.id) }}" 
+                                   class="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-green-500 text-white rounded-full font-medium hover:shadow-lg transition-all">
+                                    <i class="fas fa-play mr-2"></i>
+                                    {% if progress and progress.completion_percentage > 0 %}Continue Learning{% else %}Start Course{% endif %}
+                                </a>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('course_detail', course_id=course.id) }}" 
+                                   class="group inline-flex items-center justify-center px-6 py-3 border-2 border-gray-200 rounded-full font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-colors">
+                                    <i class="fas fa-eye mr-2"></i>
+                                    Course Details
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    {% if progress and progress.completion_percentage >= 100 %}
-                    <a href="{{ url_for('certificate', course_id=course.id) }}" 
-                       class="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg text-sm font-medium hover:from-green-600 hover:to-blue-600 transition-all w-full sm:w-auto">
-                        <i class="fas fa-certificate mr-2"></i>
-                        Certificate
-                    </a>
-                    {% else %}
-                    <a href="{{ url_for('course_detail', course_id=course.id) }}" 
-                       class="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-green-600 transition-all w-full sm:w-auto">
-                        <i class="fas fa-play mr-2"></i>
-                        {% if progress and progress.completion_percentage > 0 %}Continue{% else %}Start{% endif %}
-                    </a>
-                    {% endif %}
-                    
-                    <a href="{{ url_for('course_detail', course_id=course.id) }}" 
-                       class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors w-full sm:w-auto">
-                        <i class="fas fa-eye mr-2"></i>
-                        View
-                    </a>
-                </div>
-            </div>
-            
-            <!-- Course Tags -->
-            <div class="mt-4 pt-4 border-t border-gray-200">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                    <div class="flex flex-wrap gap-3 text-xs sm:text-sm text-gray-500">
-                        {% if progress %}
-                        <span class="flex items-center">
-                            <i class="fas fa-clock mr-1"></i>
-                            Last accessed {{ progress.last_accessed.strftime('%b %d') }}
+                <!-- Course Footer -->
+                <div class="px-6 py-4 bg-gray-50 rounded-b-xl border-t border-gray-100">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                            {% if progress %}
+                            <span class="flex items-center">
+                                <i class="fas fa-history mr-2"></i>
+                                Last accessed {{ progress.last_accessed.strftime('%b %d') }}
+                            </span>
+                            {% endif %}
+                            <span class="flex items-center">
+                                <i class="fas fa-calendar mr-2"></i>
+                                Created {{ course.created_at.strftime('%b %d, %Y') }}
+                            </span>
+                        </div>
+                        
+                        {% if progress and progress.completion_percentage >= 100 %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Completed
+                        </span>
+                        {% elif progress and progress.completion_percentage > 0 %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            <i class="fas fa-spinner mr-2"></i>
+                            In Progress
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                            <i class="fas fa-circle mr-2"></i>
+                            Not Started
                         </span>
                         {% endif %}
-                        <span class="flex items-center">
-                            <i class="fas fa-book mr-1"></i>
-                            {{ course.topic }}
-                        </span>
                     </div>
-                    
-                    {% if progress and progress.completion_percentage >= 100 %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <i class="fas fa-check-circle mr-1"></i>
-                        Completed
-                    </span>
-                    {% elif progress and progress.completion_percentage > 0 %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <i class="fas fa-play-circle mr-1"></i>
-                        In Progress
-                    </span>
-                    {% else %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <i class="fas fa-circle mr-1"></i>
-                        Not Started
-                    </span>
-                    {% endif %}
                 </div>
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
 
-    {% else %}
-    <!-- Empty State -->
-    <div class="text-center py-12 sm:py-16">
-        <div class="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <i class="fas fa-graduation-cap text-gray-400 text-2xl sm:text-3xl"></i>
+        {% else %}
+        <!-- Empty State -->
+        <div class="relative">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-green-500 rounded-3xl transform -rotate-1 opacity-10"></div>
+            <div class="relative bg-white rounded-3xl p-12 text-center">
+                <div class="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-8">
+                    <i class="fas fa-graduation-cap text-blue-600 text-4xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">Start Your Learning Journey</h3>
+                <p class="text-gray-600 mb-8 max-w-md mx-auto">
+                    You haven't created any courses yet. Begin your personalized learning experience with AI-powered courses tailored just for you!
+                </p>
+                <a href="{{ url_for('create_course') }}" class="group inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-green-500 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all transform hover:scale-105">
+                    <i class="fas fa-plus mr-3"></i>
+                    Create Your First Course
+                    <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                </a>
+            </div>
         </div>
-        <h3 class="text-lg sm:text-xl font-semibold text-gray-900 mb-4">No courses yet</h3>
-        <p class="text-sm sm:text-base text-gray-600 mb-8 max-w-md mx-auto">
-            You haven't created any courses yet. Start your learning journey by creating your first AI-powered course!
-        </p>
-        <a href="{{ url_for('create_course') }}" class="inline-flex items-center justify-center bg-gradient-to-r from-blue-500 to-green-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105 w-full sm:w-auto mx-4 sm:mx-0">
-            <i class="fas fa-plus mr-3"></i>
-            Create Your First Course
-        </a>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
+
+<style>
+.from-blue-50 {
+    --tw-gradient-from: #EFF6FF;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(239, 246, 255, 0));
+}
+</style>
 {% endblock %}
