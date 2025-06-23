@@ -373,39 +373,83 @@ class AIService:
         """Generate final exam and assignment"""
         import random
         try:
-            # Randomize final exam question count between 25-30
-            exam_question_count = random.randint(25, 30)
+            # Generate final exam in smaller chunks
+            final_exam = self._generate_final_exam(topic, proficiency, generation_id)
+            
+            # Generate assignment separately
+            assignment = self._generate_assignment(topic, proficiency, generation_id)
+            
+            return final_exam, assignment
 
-            prompt = f"""Create final exam and assignment for {topic} course.
-        - Final exam: EXACTLY {exam_question_count} questions (mixed types, including code analysis)
-        - Assignment: practical, hands-on project
-        - Test comprehensive understanding of all 15 lesson topics
-        - Include questions that span the entire course breadth
-        - Ensure the final exam has exactly {exam_question_count} questions - no more, no less"""
+        except Exception as e:
+            logging.error(f"Final component generation failed: {e}")
+            return None, None
 
-            system_prompt = """Create final exam and assignment in JSON format:
-        {
-            "final_exam": {
-                "title": "Final Exam",
-                "questions": [
-                    {
-                        "question": "Question text?",
-                        "type": "multiple_choice",
-                        "options": ["Option A", "Option B", "Option C", "Option D"],
-                        "correct_answer": "Option A",
-                        "explanation": "Explanation"
-                    },
-                    {
-                        "question": "What does this code do?",
-                        "type": "code_analysis",
-                        "code": "print('Hello')",
-                        "options": ["Option A", "Option B", "Option C", "Option D"],
-                        "correct_answer": "Option A",
-                        "explanation": "Explanation"
-                    }
-                ]
-            },
-            "assignment": {
+    def _generate_final_exam(self, topic, proficiency, generation_id):
+        """Generate final exam in smaller chunks"""
+        try:
+            # Generate questions in smaller batches
+            questions = []
+            batch_size = 5  # Generate 5 questions at a time
+            total_questions = 25
+            
+            for i in range(0, total_questions, batch_size):
+                remaining = min(batch_size, total_questions - len(questions))
+                
+                prompt = f"""Create {remaining} questions for {topic} final exam.
+                - Questions should be mixed types (multiple choice and code analysis)
+                - Test comprehensive understanding
+                - Each question must have clear correct_answer and explanation
+                - Questions {len(questions)+1} to {len(questions)+remaining} of {total_questions} total"""
+
+                system_prompt = """Create exam questions in JSON format:
+                {
+                    "questions": [
+                        {
+                            "question": "Question text?",
+                            "type": "multiple_choice",
+                            "options": ["Option A", "Option B", "Option C", "Option D"],
+                            "correct_answer": "Option A",
+                            "explanation": "Explanation"
+                        }
+                    ]
+                }"""
+
+                response = self._make_api_request(system_prompt, prompt)
+                data = self._parse_json_response(response)
+                
+                if data and 'questions' in data:
+                    questions.extend(data['questions'])
+                    
+                # Update progress
+                progress = 85 + (len(questions) / total_questions) * 10
+                self.generation_status[generation_id]['progress'] = int(progress)
+                self.generation_status[generation_id]['message'] = f'Creating final exam ({len(questions)}/{total_questions} questions)...'
+
+            # Ensure we have exactly the right number of questions
+            if len(questions) > total_questions:
+                questions = questions[:total_questions]
+            
+            return {
+                "title": f"{topic} Final Exam",
+                "questions": questions
+            }
+
+        except Exception as e:
+            logging.error(f"Final exam generation failed: {e}")
+            raise
+
+    def _generate_assignment(self, topic, proficiency, generation_id):
+        """Generate practical assignment"""
+        try:
+            prompt = f"""Create a practical, hands-on project assignment for {topic} course ({proficiency} level).
+            - Should be challenging but achievable
+            - Include clear step-by-step instructions
+            - Provide estimated completion time
+            - List any required resources or tools"""
+
+            system_prompt = """Create assignment in JSON format:
+            {
                 "title": "Assignment Title",
                 "description": "Assignment description",
                 "instructions": "Step-by-step instructions",
@@ -413,24 +457,32 @@ class AIService:
                 "difficulty": "beginner",
                 "estimated_hours": 2,
                 "resources": []
-            }
-        }"""
+            }"""
 
             response = self._make_api_request(system_prompt, prompt)
             data = self._parse_json_response(response)
-            return data.get("final_exam"), data.get("assignment")
+            
+            # Update progress
+            self.generation_status[generation_id]['progress'] = 95
+            self.generation_status[generation_id]['message'] = 'Creating final assignment...'
+            
+            return data
 
         except Exception as e:
-            logging.error(f"Final component generation failed: {e}")
-            return None, None
+            logging.error(f"Assignment generation failed: {e}")
+            raise
 
     def _make_api_request(self, system_prompt, user_prompt):
         """Make API request with retry logic and exponential backoff"""
-        max_retries = 4  # Increased retries
-        retry_count = 0
-
-        while retry_count < max_retries:
+        max_retries = 4  # Maximum number of retries
+        base_timeout = 60.0  # Base timeout in seconds
+        base_delay = 2  # Base delay for exponential backoff
+        
+        for retry in range(max_retries):
             try:
+                # Increase timeout with each retry
+                current_timeout = base_timeout * (1 + retry * 0.5)  # 60s, 90s, 120s, 150s
+                
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
@@ -440,42 +492,49 @@ class AIService:
                     temperature=0.7,
                     top_p=0.9,
                     max_tokens=3000,
-                    timeout=60.0  # Increased timeout
+                    timeout=current_timeout
                 )
+                
+                # Validate response structure before returning
+                if not response or not response.choices or len(response.choices) == 0:
+                    raise Exception("Invalid response structure")
+                    
                 return response
-            except Exception as api_error:
-                retry_count += 1
-                error_str = str(api_error).lower()
-
-                logging.warning(f"API request failed (attempt {retry_count}/{max_retries}): {str(api_error)}")
-
-                # Check for retryable errors
-                retryable_errors = [
-                    "504", "502", "503", "timeout", "gateway", "connection", 
-                    "rate limit", "429", "server error", "service unavailable"
-                ]
-
-                is_retryable = any(error in error_str for error in retryable_errors)
-
-                if is_retryable and retry_count < max_retries:
-                    # Exponential backoff: 5s, 10s, 20s, 40s
-                    wait_time = min(5 * (2 ** (retry_count - 1)), 60)
-                    logging.info(f"Waiting {wait_time}s before retry...")
-                    time.sleep(wait_time)
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Don't retry on certain errors
+                if "unauthorized" in error_msg or "401" in str(e):
+                    raise Exception("Invalid A4F API key. Please check your A4F_API_KEY environment variable.")
+                elif "429" in str(e) or "rate limit" in error_msg:
+                    # Special handling for rate limits - longer backoff
+                    if retry < max_retries - 1:
+                        delay = (base_delay ** (retry + 2)) + (retry * 2)  # Longer delays for rate limits
+                        logging.warning(f"Rate limit hit, waiting {delay} seconds before retry {retry + 1}")
+                        time.sleep(delay)
+                        continue
+                    raise Exception("A4F API rate limit exceeded. Please wait 5-10 minutes and try again.")
+                
+                # For other errors, use standard exponential backoff
+                if retry < max_retries - 1:
+                    delay = base_delay ** (retry + 1)  # Exponential backoff: 2, 4, 8, 16 seconds
+                    logging.warning(f"API request failed, waiting {delay} seconds before retry {retry + 1}. Error: {str(e)}")
+                    time.sleep(delay)
                     continue
+                    
+                # If we've exhausted all retries, raise the appropriate error
+                if "timeout" in error_msg or "timed out" in error_msg:
+                    raise Exception("The AI service is taking longer than expected to respond. This may be due to high demand.")
+                elif "connection" in error_msg or "network" in error_msg:
+                    raise Exception("Network connection error. The A4F API service may be temporarily unavailable.")
+                elif any(code in str(e) for code in ["502", "503", "504"]):
+                    raise Exception("A4F API service is temporarily unavailable. Please try again in a few minutes.")
                 else:
-                    # Not retryable or max retries reached
-                    if "429" in str(api_error) or "rate limit" in error_str:
-                        raise Exception("A4F API rate limit exceeded. Please wait 5-10 minutes and try again.")
-                    elif "html" in error_str or "page" in error_str:
-                        raise Exception("A4F API is returning error pages. Service may be temporarily overloaded. Please try again in a few minutes.")
-                    else:
-                        raise Exception(f"A4F API error: {str(api_error)[:100]}...")
-
-        raise Exception("A4F API service failed after multiple retries with exponential backoff.")
+                    raise Exception(f"A4F API service error: {str(e)[:100]}...")
 
     def _parse_json_response(self, response):
-        """Parse JSON response from API"""
+        """Parse JSON response from API with enhanced error handling"""
         if not response or not response.choices or len(response.choices) == 0:
             raise Exception("Invalid response structure from A4F API")
 
@@ -493,30 +552,74 @@ class AIService:
             raise Exception("A4F API service is temporarily returning error pages. This usually indicates high demand. Please wait a few minutes and try again.")
 
         # Extract JSON from markdown code blocks
-        if '```json' in content_str:
-            json_start = content_str.find('```json') + 7
-            json_end = content_str.find('```', json_start)
-            if json_end == -1:
-                json_end = len(content_str)
-            json_content = content_str[json_start:json_end].strip()
-        elif '```' in content_str:
-            json_start = content_str.find('```') + 3
-            json_end = content_str.find('```', json_start)
-            if json_end == -1:
-                json_end = len(content_str)
-            json_content = content_str[json_start:json_end].strip()
-        else:
-            json_content = content_str
+        json_content = content_str
+        if '```' in content_str:
+            # Find all code blocks
+            code_blocks = []
+            start_indices = [i for i in range(len(content_str)) if content_str.startswith('```', i)]
+            
+            for i in range(0, len(start_indices), 2):
+                if i + 1 < len(start_indices):
+                    block = content_str[start_indices[i]:start_indices[i+1]].strip('`').strip()
+                    if block.startswith('json'):
+                        block = block[4:].strip()
+                    code_blocks.append(block)
+            
+            # Use the largest valid JSON block
+            valid_jsons = []
+            for block in code_blocks:
+                try:
+                    parsed = json.loads(block)
+                    valid_jsons.append((len(str(parsed)), parsed))
+                except:
+                    continue
+            
+            if valid_jsons:
+                # Use the largest valid JSON block
+                json_content = max(valid_jsons, key=lambda x: x[0])[1]
+                return json_content
 
-        if not json_content or len(json_content) < 10:
-            raise Exception("Response content too short to be valid course data")
-
+        # If no valid JSON found in code blocks, try to extract JSON directly
         try:
+            # Find the first { or [ and last } or ]
+            start = content_str.find('{')
+            if start == -1:
+                start = content_str.find('[')
+            if start == -1:
+                raise Exception("No JSON object or array found in response")
+                
+            end = content_str.rfind('}')
+            if end == -1:
+                end = content_str.rfind(']')
+            if end == -1:
+                raise Exception("No JSON object or array found in response")
+                
+            json_content = content_str[start:end+1]
+            
+            # Try to parse the extracted content
             return json.loads(json_content)
+            
         except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse JSON. Content preview: {json_content[:200]}...")
+            # Log the error and content for debugging
+            logging.error(f"JSON parse error: {str(e)}")
+            logging.error(f"Content preview: {content_str[:200]}...")
             logging.error(f"Full content: {content_str}")
-            raise Exception("A4F API returned invalid JSON format. This may be due to service overload. Please try again.")
+            
+            # Try to clean the content
+            try:
+                # Remove any non-JSON text before the first { or [
+                cleaned = re.sub(r'^[^{[]*', '', content_str)
+                # Remove any non-JSON text after the last } or ]
+                cleaned = re.sub(r'[^\]}]*$', '', cleaned)
+                # Fix common JSON formatting issues
+                cleaned = cleaned.replace('\n', ' ').replace('\r', '')
+                cleaned = re.sub(r'\s+', ' ', cleaned)
+                # Fix unescaped quotes
+                cleaned = re.sub(r'(?<!\\)"(?![:,}\]])', '\\"', cleaned)
+                
+                return json.loads(cleaned)
+            except:
+                raise Exception("A4F API returned invalid JSON format that could not be cleaned. This may be due to service overload. Please try again.")
 
     def get_generation_status(self, generation_id):
         """Get current status of course generation"""
