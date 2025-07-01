@@ -403,14 +403,14 @@ class AIService:
                 - Questions {len(questions)+1} to {len(questions)+remaining} of {total_questions} total"""
 
                 system_prompt = """Create exam questions in JSON format:
-                {
-                    "questions": [
-                        {
-                            "question": "Question text?",
-                            "type": "multiple_choice",
-                            "options": ["Option A", "Option B", "Option C", "Option D"],
-                            "correct_answer": "Option A",
-                            "explanation": "Explanation"
+        {
+                "questions": [
+                    {
+                        "question": "Question text?",
+                        "type": "multiple_choice",
+                        "options": ["Option A", "Option B", "Option C", "Option D"],
+                        "correct_answer": "Option A",
+                        "explanation": "Explanation"
                         }
                     ]
                 }"""
@@ -440,32 +440,38 @@ class AIService:
             raise
 
     def _generate_assignment(self, topic, proficiency, generation_id):
-        """Generate practical assignment"""
+        """Generate practical assignment with properly formatted instructions and no resources field"""
         try:
             prompt = f"""Create a practical, hands-on project assignment for {topic} course ({proficiency} level).
             - Should be challenging but achievable
-            - Include clear step-by-step instructions
+            - Include clear, numbered step-by-step instructions as a list (not a string)
             - Provide estimated completion time
-            - List any required resources or tools"""
+            - Do NOT include a 'resources' field or any placeholder resources
+            - Use appropriate difficulty level based on {proficiency}"""
 
             system_prompt = """Create assignment in JSON format:
             {
                 "title": "Assignment Title",
                 "description": "Assignment description",
-                "instructions": "Step-by-step instructions",
+                "instructions": ["Step 1", "Step 2", "Step 3"],
                 "type": "practical",
                 "difficulty": "beginner",
-                "estimated_hours": 2,
-                "resources": []
+                "estimated_hours": 2
             }"""
 
             response = self._make_api_request(system_prompt, prompt)
             data = self._parse_json_response(response)
-            
+
+            # Ensure instructions is a list
+            if isinstance(data.get('instructions'), str):
+                data['instructions'] = [step.strip() for step in data['instructions'].split('\n') if step.strip()]
+
+            # Remove 'resources' if present
+            data.pop('resources', None)
+
             # Update progress
             self.generation_status[generation_id]['progress'] = 95
             self.generation_status[generation_id]['message'] = 'Creating final assignment...'
-            
             return data
 
         except Exception as e:
@@ -477,7 +483,7 @@ class AIService:
         max_retries = 4  # Maximum number of retries
         base_timeout = 60.0  # Base timeout in seconds
         base_delay = 2  # Base delay for exponential backoff
-        
+
         for retry in range(max_retries):
             try:
                 # Increase timeout with each retry
@@ -503,7 +509,7 @@ class AIService:
                 
             except Exception as e:
                 error_msg = str(e).lower()
-                
+
                 # Don't retry on certain errors
                 if "unauthorized" in error_msg or "401" in str(e):
                     raise Exception("Invalid A4F API key. Please check your A4F_API_KEY environment variable.")
@@ -513,8 +519,7 @@ class AIService:
                         delay = (base_delay ** (retry + 2)) + (retry * 2)  # Longer delays for rate limits
                         logging.warning(f"Rate limit hit, waiting {delay} seconds before retry {retry + 1}")
                         time.sleep(delay)
-                        continue
-                    raise Exception("A4F API rate limit exceeded. Please wait 5-10 minutes and try again.")
+                    continue
                 
                 # For other errors, use standard exponential backoff
                 if retry < max_retries - 1:
@@ -552,7 +557,7 @@ class AIService:
             raise Exception("A4F API service is temporarily returning error pages. This usually indicates high demand. Please wait a few minutes and try again.")
 
         # Extract JSON from markdown code blocks
-        json_content = content_str
+            json_content = content_str
         if '```' in content_str:
             # Find all code blocks
             code_blocks = []

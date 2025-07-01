@@ -47,30 +47,6 @@
                 </div>
             </div>
             
-            <!-- Resources -->
-            {% if assignment.resources %}
-                {% set resources = assignment.resources | from_json %}
-                {% if resources %}
-                    <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
-                        <h2 class="text-xl font-semibold mb-4">Resources & References</h2>
-                        <div class="space-y-3">
-                            {% for resource in resources %}
-                                <a href="{{ resource.url }}" target="_blank" class="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                                        <i class="fas fa-{% if resource.type == 'video' %}play{% elif resource.type == 'article' %}file-text{% elif resource.type == 'code' %}code{% else %}link{% endif %} text-blue-600 text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium text-gray-900">{{ resource.title }}</div>
-                                        <div class="text-sm text-gray-500 capitalize">{{ resource.type }}</div>
-                                    </div>
-                                    <i class="fas fa-external-link-alt text-gray-400 ml-auto"></i>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
-            {% endif %}
-            
             <!-- Submission Form -->
             {% if not submission or submission.status == 'submitted' %}
                 <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6">
