@@ -13,7 +13,7 @@ class AIService:
     def __init__(self):
         self.a4f_api_key = os.environ.get("A4F_API_KEY", "default-key")
         self.a4f_base_url = "https://api.a4f.co/v1"
-        self.model = "provider-5/gpt-4o"
+        self.model = "provider-5/gpt-4.1-mini"
         self.youtube_api_key = os.environ.get("YOUTUBE_API_KEY")
         
         # Add debug logging for YouTube API key
