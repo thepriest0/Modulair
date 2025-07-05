@@ -37,61 +37,71 @@
 </head>
 <body class="bg-gray-50 font-inter">
     <!-- Navigation -->
-    <nav class="bg-white shadow-lg sticky top-0 z-50">
+    <nav class="nav-backdrop sticky top-0 z-50 border-b border-gray-200">
         <div class="container-wide mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="{{ url_for('index') }}" class="flex items-center">
-                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center mr-3">
+                    <a href="{{ url_for('index') }}" class="flex items-center group">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center mr-3 transform transition-transform group-hover:scale-110">
                             <i class="fas fa-graduation-cap text-white text-sm"></i>
                         </div>
-                        <span class="text-2xl font-bold text-gray-900">ModulAIr</span>
+                        <span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600">ModulAIr</span>
                     </a>
                 </div>
                 
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
+                    <!-- Search Bar -->
+                    <div class="relative">
+                        <input type="text" placeholder="Search courses..." class="nav-search w-64 px-4 py-2 rounded-lg text-sm focus:outline-none">
+                        <i class="fas fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+
                     {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('index') }}" class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <a href="{{ url_for('index') }}" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             Dashboard
                         </a>
-                        <a href="{{ url_for('my_courses') }}" class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <a href="{{ url_for('my_courses') }}" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             My Courses
                         </a>
-                        <a href="{{ url_for('create_course') }}" class="bg-gradient-to-r from-blue-500 to-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105">
+                        <a href="{{ url_for('create_course') }}" class="nav-button bg-gradient-to-r from-blue-500 to-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-green-600 transition-all">
                             Create Course
                         </a>
                         <!-- Profile Dropdown -->
                         <div class="relative profile-dropdown">
                             <button type="button" class="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors profile-dropdown-button">
-                                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white">
                                     {{ current_user.first_name[0] if current_user.first_name else current_user.username[0] }}{{ current_user.last_name[0] if current_user.last_name else '' }}
                                 </div>
                                 <span>{{ current_user.get_full_name() }}</span>
-                                <i class="fas fa-chevron-down text-xs"></i>
+                                <i class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
                             </button>
                             
-                            <div class="profile-dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden">
-                                <a href="{{ url_for('profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    <i class="fas fa-user mr-2"></i>My Profile
+                            <div class="profile-dropdown-menu absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50">
+                                <div class="px-4 py-3 border-b border-gray-100">
+                                    <p class="text-sm font-medium text-gray-900">{{ current_user.get_full_name() }}</p>
+                                    <p class="text-xs text-gray-500">{{ current_user.email }}</p>
+                                </div>
+                                <a href="{{ url_for('profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                    <i class="fas fa-user mr-2 text-blue-500"></i>My Profile
                                 </a>
-                                <a href="{{ url_for('account_settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    <i class="fas fa-cog mr-2"></i>Account Settings
+                                <a href="{{ url_for('account_settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                    <i class="fas fa-cog mr-2 text-gray-500"></i>Account Settings
                                 </a>
-                                <a href="{{ url_for('my_courses') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    <i class="fas fa-graduation-cap mr-2"></i>My Courses
+                                <a href="{{ url_for('my_courses') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                    <i class="fas fa-graduation-cap mr-2 text-green-500"></i>My Courses
                                 </a>
-                                <div class="border-t border-gray-100"></div>
-                                <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                                <div class="border-t border-gray-100 my-1"></div>
+                                <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
                                     <i class="fas fa-sign-out-alt mr-2"></i>Sign Out
                                 </a>
                             </div>
                         </div>
                     {% else %}
-                        <a href="{{ url_for('login') }}" class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <a href="{{ url_for('login') }}" class="nav-link text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             Sign In
                         </a>
-                        <a href="{{ url_for('register') }}" class="bg-gradient-to-r from-blue-500 to-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105">
+                        <a href="{{ url_for('register') }}" class="nav-button bg-gradient-to-r from-blue-500 to-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-green-600 transition-all">
                             Get Started
                         </a>
                     {% endif %}
@@ -99,8 +109,8 @@
                 
                 <!-- Mobile menu button -->
                 <div class="md:hidden flex items-center">
-                    <button type="button" id="mobileMenuBtn" class="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">
-                        <i class="fas fa-bars"></i>
+                    <button type="button" id="mobileMenuBtn" class="inline-flex items-center justify-center p-2 rounded-lg text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-bars text-xl"></i>
                     </button>
                 </div>
             </div>
@@ -147,25 +157,71 @@
     <!-- JavaScript -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
-    <!-- New Mobile Navigation Overlay -->
-    <div id="mobileMenu" class="fixed inset-0 z-50 bg-white flex-col items-start p-6 space-y-4 hidden">
-        <button id="closeMobileMenu" class="mb-4 text-gray-700 text-2xl self-end"><i class="fas fa-times"></i></button>
+    <!-- Mobile Navigation Overlay -->
+    <div id="mobileMenu" class="fixed inset-0 z-50 bg-white flex flex-col items-start p-6 space-y-4">
+        <div class="flex items-center justify-between w-full mb-6">
+            <a href="{{ url_for('index') }}" class="flex items-center group">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center mr-3">
+                    <i class="fas fa-graduation-cap text-white text-sm"></i>
+                </div>
+                <span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600">ModulAIr</span>
+            </a>
+            <button id="closeMobileMenu" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Search -->
+        <div class="w-full mb-4">
+            <div class="relative">
+                <input type="text" placeholder="Search courses..." class="nav-search w-full px-4 py-3 rounded-lg text-base focus:outline-none">
+                <i class="fas fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+        </div>
+
         {% if current_user.is_authenticated %}
-            <div class="flex items-center mb-4">
-                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold mr-3">
+            <div class="flex items-center w-full mb-6 p-4 bg-gray-50 rounded-lg">
+                <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-bold mr-4 ring-2 ring-white">
                     {{ current_user.first_name[0] if current_user.first_name else current_user.username[0] }}{{ current_user.last_name[0] if current_user.last_name else '' }}
                 </div>
-                <span class="text-gray-700 font-medium">{{ current_user.get_full_name() }}</span>
+                <div>
+                    <p class="font-medium text-gray-900">{{ current_user.get_full_name() }}</p>
+                    <p class="text-sm text-gray-500">{{ current_user.email }}</p>
+                </div>
             </div>
-            <a href="{{ url_for('index') }}" class="block w-full text-gray-700 hover:text-blue-600 py-2 text-lg font-medium"><i class="fas fa-home mr-2"></i>Dashboard</a>
-            <a href="{{ url_for('profile') }}" class="block w-full text-gray-700 hover:text-blue-600 py-2 text-lg font-medium"><i class="fas fa-user mr-2"></i>My Profile</a>
-            <a href="{{ url_for('my_courses') }}" class="block w-full text-gray-700 hover:text-blue-600 py-2 text-lg font-medium"><i class="fas fa-graduation-cap mr-2"></i>My Courses</a>
-            <a href="{{ url_for('create_course') }}" class="block w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-2 rounded-lg text-lg font-medium text-center my-2"><i class="fas fa-plus mr-2"></i>Create Course</a>
-            <a href="{{ url_for('account_settings') }}" class="block w-full text-gray-700 hover:text-blue-600 py-2 text-lg font-medium"><i class="fas fa-cog mr-2"></i>Settings</a>
-            <a href="{{ url_for('logout') }}" class="block w-full text-red-600 hover:text-red-700 py-2 text-lg font-medium"><i class="fas fa-sign-out-alt mr-2"></i>Sign Out</a>
+
+            <a href="{{ url_for('index') }}" class="mobile-nav-link w-full flex items-center text-gray-700">
+                <i class="fas fa-home mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">Dashboard</span>
+            </a>
+            <a href="{{ url_for('profile') }}" class="mobile-nav-link w-full flex items-center text-gray-700">
+                <i class="fas fa-user mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">My Profile</span>
+            </a>
+            <a href="{{ url_for('my_courses') }}" class="mobile-nav-link w-full flex items-center text-gray-700">
+                <i class="fas fa-graduation-cap mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">My Courses</span>
+            </a>
+            <a href="{{ url_for('create_course') }}" class="nav-button w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 rounded-lg text-lg font-medium text-center my-4">
+                <i class="fas fa-plus mr-2"></i>Create Course
+            </a>
+            <a href="{{ url_for('account_settings') }}" class="mobile-nav-link w-full flex items-center text-gray-700">
+                <i class="fas fa-cog mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">Settings</span>
+            </a>
+            <div class="border-t border-gray-200 w-full my-4"></div>
+            <a href="{{ url_for('logout') }}" class="mobile-nav-link w-full flex items-center text-red-600">
+                <i class="fas fa-sign-out-alt mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">Sign Out</span>
+            </a>
         {% else %}
-            <a href="{{ url_for('login') }}" class="block w-full text-gray-700 hover:text-blue-600 py-2 text-lg font-medium">Sign In</a>
-            <a href="{{ url_for('register') }}" class="block w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-2 rounded-lg text-lg font-medium text-center my-2">Get Started</a>
+            <a href="{{ url_for('login') }}" class="mobile-nav-link w-full flex items-center text-gray-700">
+                <i class="fas fa-sign-in-alt mr-3 mobile-nav-icon"></i>
+                <span class="text-lg">Sign In</span>
+            </a>
+            <a href="{{ url_for('register') }}" class="nav-button w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 rounded-lg text-lg font-medium text-center my-4">
+                <i class="fas fa-user-plus mr-2"></i>Get Started
+            </a>
         {% endif %}
     </div>
 </body>

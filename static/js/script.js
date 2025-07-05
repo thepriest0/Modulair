@@ -1,27 +1,31 @@
 // ModulAIr JavaScript functionality
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Profile dropdown toggle
+    // Profile dropdown toggle with animation
     const profileDropdownButton = document.querySelector('.profile-dropdown-button');
     const profileDropdownMenu = document.querySelector('.profile-dropdown-menu');
+    const dropdownChevron = profileDropdownButton?.querySelector('.fa-chevron-down');
     
     if (profileDropdownButton && profileDropdownMenu) {
         profileDropdownButton.addEventListener('click', function(e) {
             e.stopPropagation();
-            profileDropdownMenu.classList.toggle('hidden');
+            profileDropdownMenu.classList.toggle('visible');
+            dropdownChevron?.style.setProperty('transform', profileDropdownMenu.classList.contains('visible') ? 'rotate(180deg)' : 'rotate(0deg)');
         });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!profileDropdownButton.contains(e.target) && !profileDropdownMenu.contains(e.target)) {
-                profileDropdownMenu.classList.add('hidden');
+                profileDropdownMenu.classList.remove('visible');
+                dropdownChevron?.style.setProperty('transform', 'rotate(0deg)');
             }
         });
 
         // Close dropdown on escape key
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                profileDropdownMenu.classList.add('hidden');
+            if (e.key === 'Escape' && profileDropdownMenu.classList.contains('visible')) {
+                profileDropdownMenu.classList.remove('visible');
+                dropdownChevron?.style.setProperty('transform', 'rotate(0deg)');
             }
         });
     }
@@ -254,46 +258,96 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Mobile menu functionality
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const closeMobileMenuBtn = document.getElementById('closeMobileMenu');
+    const mobileMenu = document.getElementById('mobileMenu');
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    if (mobileMenuBtn && mobileMenu && closeMobileMenuBtn) {
+        // Toggle mobile menu
+        mobileMenuBtn.addEventListener('click', function() {
+            mobileMenu.classList.add('visible');
+            document.body.style.overflow = 'hidden'; // Prevent body scroll
+        });
+
+        closeMobileMenuBtn.addEventListener('click', function() {
+            mobileMenu.classList.remove('visible');
+            document.body.style.overflow = ''; // Restore body scroll
+        });
+
+        // Handle swipe to close
+        mobileMenu.addEventListener('touchstart', function(e) {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        mobileMenu.addEventListener('touchmove', function(e) {
+            touchEndX = e.touches[0].clientX;
+            const swipeDistance = touchEndX - touchStartX;
+            
+            if (swipeDistance > 0) { // Only allow right swipe
+                mobileMenu.style.transform = `translateX(${swipeDistance}px)`;
+            }
+        });
+
+        mobileMenu.addEventListener('touchend', function() {
+            const swipeDistance = touchEndX - touchStartX;
+            
+            if (swipeDistance > 100) { // If swiped more than 100px
+                mobileMenu.classList.remove('visible');
+                document.body.style.overflow = '';
+            }
+            
+            mobileMenu.style.transform = ''; // Reset transform
+            touchStartX = 0;
+            touchEndX = 0;
+        });
+
+        // Close mobile menu on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && mobileMenu.classList.contains('visible')) {
+                mobileMenu.classList.remove('visible');
+                document.body.style.overflow = '';
+            }
+        });
+    }
+
     // Search functionality
-    const searchInput = document.getElementById('search-input');
-    const searchResults = document.getElementById('search-results');
-    
-    if (searchInput && searchResults) {
-        let searchTimeout;
-        searchInput.addEventListener('input', function() {
+    const searchInputs = document.querySelectorAll('.nav-search');
+    let searchTimeout;
+
+    searchInputs.forEach(input => {
+        input.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
             
-            if (query.length < 2) {
-                searchResults.innerHTML = '';
-                searchResults.classList.add('hidden');
-                return;
-            }
-            
+            // Debounce search
             searchTimeout = setTimeout(() => {
-                performSearch(query);
+                if (query.length >= 2) {
+                    performSearch(query);
+                }
             }, 300);
         });
-    }
 
-    // New Mobile Menu Overlay Toggle
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    const closeMobileMenu = document.getElementById('closeMobileMenu');
-
-    if (mobileMenuBtn && mobileMenu && closeMobileMenu) {
-        mobileMenuBtn.addEventListener('click', function() {
-            mobileMenu.classList.remove('hidden');
-        });
-        closeMobileMenu.addEventListener('click', function() {
-            mobileMenu.classList.add('hidden');
-        });
-        mobileMenu.addEventListener('click', function(e) {
-            if (e.target === mobileMenu) {
-                mobileMenu.classList.add('hidden');
+        // Clear search on escape
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                this.blur();
             }
         });
-    }
+    });
+
+    // Active link highlighting
+    const navLinks = document.querySelectorAll('.nav-link');
+    const currentPath = window.location.pathname;
+
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
 });
 
 // Utility functions

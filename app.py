@@ -426,12 +426,17 @@ def delete_account():
 
 @app.route('/')
 def index():
-    """Home page with dashboard"""
-    if current_user.is_authenticated:
-        recent_courses = Course.query.filter_by(user_id=current_user.id).order_by(Course.created_at.desc()).limit(3).all()
-        return render_template('index.html', recent_courses=recent_courses)
-    else:
+    """Landing page or dashboard"""
+    if not current_user.is_authenticated:
         return render_template('landing.html')
+
+    # Get recent courses for the user
+    recent_courses = Course.query.filter_by(user_id=current_user.id)\
+        .order_by(Course.created_at.desc())\
+        .limit(5)\
+        .all()
+
+    return render_template('index.html', recent_courses=recent_courses)
 
 @app.route('/create-course', methods=['GET', 'POST'])
 @login_required
